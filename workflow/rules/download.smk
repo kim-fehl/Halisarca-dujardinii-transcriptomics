@@ -7,7 +7,7 @@ rule prefetch_sra:
     shell:
         """
         mkdir -p resources/sra
-        prefetch -p -v -O resources/sra {wildcards.run}
+        prefetch -q -o {output.sra} {wildcards.run}
         """
 
 
@@ -22,6 +22,6 @@ rule fasterq_dump:
     shell:
         """
         mkdir -p resources/raw
-        fasterq-dump --threads {threads} --outdir resources/raw {wildcards.run}
+        fasterq-dump --threads {threads} --outdir resources/raw {input.sra}
         pigz -p {threads} -f resources/raw/{wildcards.run}.fastq
         """
