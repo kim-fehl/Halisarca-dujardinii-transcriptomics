@@ -87,10 +87,9 @@ rule infer_strandness_map:
     output:
         bam="results/qc/rseqc/{run}.strand_infer.bam"
     params:
-        read_limit=lambda wildcards: int(config["processing"]["infer_experiment_read_limit"]),
+        read_limit=lambda wildcards: int(config["processing"].get("infer_experiment_read_limit", 200000)),
         prefix=lambda wildcards: f"results/qc/rseqc/{wildcards.run}.infer_"
-    threads:
-        lambda wildcards: max(1, int(config["processing"]["max_threads"]) // 4)
+    threads: AUX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:

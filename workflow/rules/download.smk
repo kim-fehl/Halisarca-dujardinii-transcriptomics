@@ -16,8 +16,7 @@ rule fasterq_dump:
         sra=rules.prefetch_sra.output.sra
     output:
         fastq="resources/raw/{run}.fastq.gz"
-    threads:
-        lambda wildcards: int(config["processing"]["max_threads"])
+    threads: MAX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:

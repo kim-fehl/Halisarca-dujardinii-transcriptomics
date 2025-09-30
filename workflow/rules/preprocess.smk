@@ -6,11 +6,10 @@ rule fastp_single_end:
         html="results/fastp/{run}.fastp.html",
         json="results/fastp/{run}.fastp.json"
     params:
-        min_length=lambda wildcards: int(config["processing"]["fastp_min_length"]),
+        min_length=lambda wildcards: int(config["processing"].get("fastp_min_length", 25)),
         extra=lambda wildcards: config["processing"].get("fastp_extra", ""),
         sample=lambda wildcards: RUN_TO_SAMPLE[wildcards.run]
-    threads:
-        lambda wildcards: max(1, int(config["processing"]["max_threads"]) // 4)
+    threads: AUX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:

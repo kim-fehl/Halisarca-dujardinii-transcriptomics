@@ -10,8 +10,7 @@ rule star_genome_index:
         read_length="results/qc/read_length.txt"
     output:
         directory(str(Path(config["genome"]["star_index_dir"]).expanduser()))
-    threads:
-        lambda wildcards: int(config["processing"]["max_threads"])
+    threads: MAX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:
@@ -27,7 +26,7 @@ rule star_genome_index:
             --sjdbGTFfile {input.gff} \
             --sjdbGTFtagExonParentTranscript Parent \
             --sjdbOverhang ${overhang} \
-            --genomeSAindexNbases {config["processing"]["star_sa_index_n_bases"]}
+            --genomeSAindexNbases {config["processing"].get("star_sa_index_n_bases", 12)}
         """
 
 
@@ -40,8 +39,7 @@ rule star_align_single_end:
         bam="results/bam/{run}_Aligned.out.bam"
     params:
         out_prefix=lambda wildcards: f"results/bam/{wildcards.run}_"
-    threads:
-        lambda wildcards: int(config["processing"]["max_threads"])
+    threads: MAX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:
@@ -70,8 +68,7 @@ rule sort_bam:
         bam=rules.star_align_single_end.output.bam
     output:
         sorted="results/bam/{run}.sorted.bam"
-    threads:
-        lambda wildcards: max(1, int(config["processing"]["max_threads"]) // 4)
+    threads: AUX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:

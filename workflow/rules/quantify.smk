@@ -12,8 +12,7 @@ rule featurecounts:
         summary=f"results/counts/counts_exons_{config['project']['name']}.tsv.summary"
     params:
         extra=lambda wildcards: config["processing"].get("featurecounts_extra", "")
-    threads:
-        lambda wildcards: int(config["processing"]["max_threads"])
+    threads: MAX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:
