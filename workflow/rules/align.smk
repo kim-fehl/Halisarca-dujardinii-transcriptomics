@@ -24,7 +24,6 @@ def _star_index_extra(read_length_path, annotation_path):
 def _star_align_extra(strand_path):
     strand = Path(strand_path).read_text(encoding="ascii").strip()
     extras = [
-        "--readFilesCommand zcat",
         "--outSAMtype BAM Unsorted",
         "--outSAMattributes NH HI AS nM XS",
     ]

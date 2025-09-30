@@ -3,7 +3,6 @@ from pathlib import Path
 
 def _infer_star_extra(read_limit):
     extras = [
-        "--readFilesCommand zcat",
         "--outSAMtype BAM Unsorted",
         "--outSAMattributes NH HI AS nM XS",
         f"--readMapNumber {read_limit}",
