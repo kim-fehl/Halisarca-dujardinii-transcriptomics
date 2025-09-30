@@ -2,6 +2,7 @@ rule prefetch_sra:
     output:
         sra="resources/sra/{run}.sra"
     threads: 1
+    retries: 3
     conda:
         "../envs/pipeline.yaml"
     shell:
@@ -16,7 +17,7 @@ rule fasterq_dump:
         sra=rules.prefetch_sra.output.sra
     output:
         fastq="resources/raw/{run}.fastq.gz"
-    threads: MAX_THREADS
+    threads: AUX_THREADS
     conda:
         "../envs/pipeline.yaml"
     shell:
