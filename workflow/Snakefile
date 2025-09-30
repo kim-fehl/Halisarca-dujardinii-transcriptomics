@@ -1,0 +1,57 @@
+import re
+from pathlib import Path
+
+import pandas as pd
+
+configfile: "config/config.yaml"
+
+shell.executable("/bin/bash")
+shell.prefix("set -euo pipefail; ")
+
+metadata_df = pd.read_csv(Path(config["project"]["metadata"]).expanduser(), sep="\t", encoding="utf-16")
+metadata_df.columns = [str(col).strip() for col in metadata_df.columns]
+metadata_df = metadata_df.dropna(subset=["run_accession"])  # ensure essential column exists
+metadata_df["run_accession"] = metadata_df["run_accession"].astype(str)
+
+name_columns = [
+    col
+    for col in ("library_name", "sample_accession", "biosample")
+    if col in metadata_df.columns
+]
+
+if name_columns:
+    def _derive_sample_name(row):
+        for col in name_columns:
+            value = row.get(col)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return row["run_accession"]
+else:
+    def _derive_sample_name(row):
+        return row["run_accession"]
+
+metadata_df["sample_id"] = (
+    metadata_df.apply(_derive_sample_name, axis=1)
+    .map(lambda name: re.sub(r"[^A-Za-z0-9._-]+", "_", name))
+)
+
+RUN_TO_SAMPLE = dict(zip(metadata_df["run_accession"], metadata_df["sample_id"]))
+RUN_IDS = sorted(RUN_TO_SAMPLE.keys())
+SAMPLE_IDS = sorted(set(RUN_TO_SAMPLE.values()))
+if not RUN_IDS:
+    raise ValueError("No run_accession entries found in metadata")
+PRIMARY_RUN = RUN_IDS[0]
+
+ruleorder: sort_bam > featurecounts
+
+include: "rules/download.smk"
+include: "rules/preprocess.smk"
+include: "rules/qc.smk"
+include: "rules/align.smk"
+include: "rules/quantify.smk"
+
+rule all:
+    input:
+        f"results/counts/counts_exons_{config['project']['name']}.tsv.gz",
+        "results/qc/multiqc/multiqc_report.html",
+        "results/qc/rseqc/featurecounts_strand.txt"

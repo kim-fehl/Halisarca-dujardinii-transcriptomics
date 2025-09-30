@@ -1,0 +1,17 @@
+name: rnaseq-pipeline
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - pandas
+  - sra-tools
+  - pigz
+  - fastp
+  - star
+  - sambamba
+  - subread
+  - rseqc
+  - multiqc
+  - gffread

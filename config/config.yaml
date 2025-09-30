@@ -1,0 +1,16 @@
+project:
+  name: hd_rnaseq
+  metadata: config/samples_metadata.tsv
+
+genome:
+  fasta: resources/genome/hd_202006_masurca_red235.fna
+  annotation: resources/genome/hd_202006_maker_exons_v2_ribo.gff
+  star_index_dir: resources/genome/star_index
+
+processing:
+  max_threads: 32
+  fastp_min_length: 25
+  fastp_extra: "-y -p -5 -3 -r -W 5"
+  featurecounts_extra: "-M --fraction -t exon -g Parent"
+  infer_experiment_read_limit: 200000
+  star_sa_index_n_bases: 12
