@@ -82,12 +82,12 @@ rule annotation_bed:
 
 rule infer_strandness_map:
     input:
-        fastq=rules.fastp_single_end.output.fastq,
-        index=rules.star_genome_index.output
+        fastq="results/fastp/{run}.fastp.fastq.gz",
+        index="resources/genome/STAR_index"
     output:
         bam="results/qc/rseqc/{run}.strand_infer.bam"
     params:
-        read_limit=lambda wildcards: int(config["processing"].get("infer_experiment_read_limit", 200000)),
+        read_limit=lambda wildcards: int(PROCESSING.get("infer_experiment_read_limit", 200000)),
         prefix=lambda wildcards: f"results/qc/rseqc/{wildcards.run}.infer_"
     threads: AUX_THREADS
     conda:
@@ -115,8 +115,7 @@ rule infer_strandness_report:
         bam=rules.infer_strandness_map.output.bam,
         annotation=rules.annotation_bed.output
     output:
-        report="results/qc/rseqc/{run}.infer_experiment.txt",
-        strand="results/qc/rseqc/{run}.strand.txt"
+        report="results/qc/rseqc/{run}.infer_experiment.txt"
     conda:
         "../envs/pipeline.yaml"
     shell:

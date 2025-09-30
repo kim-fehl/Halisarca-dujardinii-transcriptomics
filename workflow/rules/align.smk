@@ -9,7 +9,7 @@ rule star_genome_index:
         gff=lambda wildcards: str(Path(config["genome"]["annotation"]).expanduser()),
         read_length="results/qc/read_length.txt"
     output:
-        directory(str(Path(config["genome"]["star_index_dir"]).expanduser()))
+        directory("resources/genome/STAR_index")
     threads: MAX_THREADS
     conda:
         "../envs/pipeline.yaml"
@@ -32,9 +32,9 @@ rule star_genome_index:
 
 rule star_align_single_end:
     input:
-        fastq=rules.fastp_single_end.output.fastq,
-        index=rules.star_genome_index.output,
-        strand=rules.infer_strandness_report.output.strand
+        fastq="results/fastp/{run}.fastp.fastq.gz",
+        index="resources/genome/STAR_index",
+        strand="results/qc/rseqc/{run}.strand.txt"
     output:
         bam="results/bam/{run}_Aligned.out.bam"
     params:
@@ -65,7 +65,7 @@ rule star_align_single_end:
 
 rule sort_bam:
     input:
-        bam=rules.star_align_single_end.output.bam
+        bam="results/bam/{run}_Aligned.out.bam"
     output:
         sorted="results/bam/{run}.sorted.bam"
     threads: AUX_THREADS
