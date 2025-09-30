@@ -10,6 +10,8 @@ rule star_genome_index:
         read_length="results/qc/read_length.txt"
     output:
         directory("resources/genome/STAR_index")
+    log:
+        "logs/star/genome_index.log"
     threads: MAX_THREADS
     params:
         star_sa_index_n_bases=lambda wildcards: config["processing"].get("star_sa_index_n_bases", 12)
@@ -18,8 +20,8 @@ rule star_genome_index:
     shell:
         """
         mkdir -p {output}
+        ulimit -n 65536
         read_length=$(cat {input.read_length})
-        overhang=$((read_length - 1))
         STAR \
             --runThreadN {threads} \
             --runMode genomeGenerate \
@@ -27,8 +29,8 @@ rule star_genome_index:
             --genomeFastaFiles {input.fasta} \
             --sjdbGTFfile {input.gff} \
             --sjdbGTFtagExonParentTranscript Parent \
-            --sjdbOverhang ${{overhang}} \
-            --genomeSAindexNbases {params.star_sa_index_n_bases}
+            --sjdbOverhang $((read_length - 1)) \
+            --genomeSAindexNbases {params.star_sa_index_n_bases} > {log} 2>&1
         """
 
 
@@ -47,6 +49,7 @@ rule star_align_single_end:
     shell:
         """
         mkdir -p results/bam
+        ulimit -n 65536
         strand=$(cat {input.strand})
         strand_args=()
         if [[ "$strand" == "UNSTRANDED" ]]; then
@@ -61,7 +64,7 @@ rule star_align_single_end:
             --outFileNamePrefix {params.out_prefix} \
             --outSAMtype BAM Unsorted \
             --outSAMattributes NH HI AS nM XS \
-            "${strand_args[@]}"
+            "${{strand_args[@]}}"
         """
 
 
