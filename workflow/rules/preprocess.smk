@@ -5,6 +5,8 @@ rule fastp_single_end:
         fastq="results/fastp/{run}.fastp.fastq.gz",
         html="results/fastp/{run}.fastp.html",
         json="results/fastp/{run}.fastp.json"
+    log:
+        "logs/fastp/{run}.log"
     params:
         min_length=lambda wildcards: int(config["processing"].get("fastp_min_length", 25)),
         extra=lambda wildcards: config["processing"].get("fastp_extra", ""),
@@ -24,5 +26,5 @@ rule fastp_single_end:
             -h {output.html} \
             -j {output.json} \
             -R {params.sample} \
-            {params.extra}
+            {params.extra} > {log} 2>&1
         """

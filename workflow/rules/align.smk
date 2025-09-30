@@ -11,6 +11,8 @@ rule star_genome_index:
     output:
         directory("resources/genome/STAR_index")
     threads: MAX_THREADS
+    params:
+        star_sa_index_n_bases=lambda wildcards: config["processing"].get("star_sa_index_n_bases", 12)
     conda:
         "../envs/pipeline.yaml"
     shell:
@@ -25,8 +27,8 @@ rule star_genome_index:
             --genomeFastaFiles {input.fasta} \
             --sjdbGTFfile {input.gff} \
             --sjdbGTFtagExonParentTranscript Parent \
-            --sjdbOverhang ${overhang} \
-            --genomeSAindexNbases {config["processing"].get("star_sa_index_n_bases", 12)}
+            --sjdbOverhang ${{overhang}} \
+            --genomeSAindexNbases {params.star_sa_index_n_bases}
         """
 
 
