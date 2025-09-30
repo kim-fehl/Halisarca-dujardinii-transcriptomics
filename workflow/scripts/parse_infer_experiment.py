@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import sys
+
 
 report_path = Path(snakemake.input["report"])
 strand_path = Path(snakemake.output["strand"])
@@ -37,5 +37,4 @@ if strand == "UNSTRANDED" and same is not None and opposite is not None:
     elif opposite >= 0.8 and opposite - same >= 0.2:
         strand = "FR_FIRSTSTRAND"
 
-strand_path.parent.mkdir(parents=True, exist_ok=True)
 strand_path.write_text(strand + "\n", encoding="ascii")

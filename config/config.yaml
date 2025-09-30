@@ -3,8 +3,9 @@ project:
   metadata: config/samples_metadata.tsv
 
 genome:
-  fasta: resources/genome/hd_202006_masurca_red235.fna
-  annotation: resources/genome/hd_202006_maker_exons_v2_ribo.gff
+
+  fasta: resources/genome/SkHd2_genome_21chr_mito_1688unplaced.fasta
+  annotation: resources/genome/SkHd2_protein_coding_longest_transcripts.gff3
 
 processing:
   fastp_min_length: 25

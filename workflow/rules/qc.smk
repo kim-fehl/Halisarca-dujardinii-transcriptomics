@@ -123,6 +123,13 @@ rule infer_strandness_report:
         """
         infer_experiment.py -r {input.annotation} -i {input.bam} > {output.report}
         """
+
+
+rule infer_strandness_parse:
+    input:
+        report=rules.infer_strandness_report.output.report
+    output:
+        strand="results/qc/rseqc/{run}.strand.txt"
     script:
         "../scripts/parse_infer_experiment.py"
 
