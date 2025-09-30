@@ -1,6 +1,19 @@
 from pathlib import Path
 
 
+def _infer_star_extra(read_limit):
+    extras = [
+        "--readFilesCommand zcat",
+        "--outSAMtype BAM Unsorted",
+        "--outSAMattributes NH HI AS nM XS",
+        f"--readMapNumber {read_limit}",
+    ]
+    custom = config["processing"].get("infer_experiment_star_extra", "").strip()
+    if custom:
+        extras.append(custom)
+    return " ".join(extras)
+
+
 rule detect_read_length:
     input:
         json=f"results/fastp/{PRIMARY_RUN}.fastp.json"
@@ -82,37 +95,26 @@ rule annotation_bed:
 
 rule infer_strandness_map:
     input:
-        fastq="results/fastp/{run}.fastp.fastq.gz",
-        index="resources/genome/STAR_index"
+        fq1="results/fastp/{run}.fastp.fastq.gz",
+        idx="resources/genome/STAR_index"
     output:
-        bam="results/qc/rseqc/{run}.strand_infer.bam"
+        aln="results/qc/rseqc/{run}.strand_infer.bam",
+        log="results/qc/rseqc/{run}.strand_infer.Log.out",
+        log_final="results/qc/rseqc/{run}.strand_infer.Log.final.out",
+        unmapped="results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1",
+        sj="results/qc/rseqc/{run}.strand_infer.SJ.out.tab"
     params:
-        read_limit=lambda wildcards: int(config["processing"].get("infer_experiment_read_limit", 200000)),
-        prefix=lambda wildcards: f"results/qc/rseqc/{wildcards.run}.infer_"
+        extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
     threads: AUX_THREADS
-    conda:
-        "../envs/pipeline.yaml"
-    shell:
-        """
-        mkdir -p results/qc/rseqc
-        prefix="{params.prefix}"
-        STAR \
-            --runThreadN {threads} \
-            --genomeDir {input.index} \
-            --readFilesIn {input.fastq} \
-            --readFilesCommand gunzip -c \
-            --readMapNumber {params.read_limit} \
-            --outSAMtype BAM Unsorted \
-            --outFileNamePrefix ${prefix}
-
-        mv ${prefix}Aligned.out.bam {output.bam}
-        rm -f ${prefix}Log.progress.out ${prefix}Log.final.out ${prefix}Log.out
-        """
+    log:
+        "logs/star/{run}.infer_strandness_map.log"
+    wrapper:
+        "v7.2.0/bio/star/align"
 
 
 rule infer_strandness_report:
     input:
-        bam=rules.infer_strandness_map.output.bam,
+        bam=rules.infer_strandness_map.output.aln,
         annotation=rules.annotation_bed.output
     output:
         report="results/qc/rseqc/{run}.infer_experiment.txt"
