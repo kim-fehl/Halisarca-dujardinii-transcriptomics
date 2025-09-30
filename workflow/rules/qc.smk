@@ -87,7 +87,7 @@ rule infer_strandness_map:
     output:
         bam="results/qc/rseqc/{run}.strand_infer.bam"
     params:
-        read_limit=lambda wildcards: int(PROCESSING.get("infer_experiment_read_limit", 200000)),
+        read_limit=lambda wildcards: int(config["processing"].get("infer_experiment_read_limit", 200000)),
         prefix=lambda wildcards: f"results/qc/rseqc/{wildcards.run}.infer_"
     threads: AUX_THREADS
     conda:
