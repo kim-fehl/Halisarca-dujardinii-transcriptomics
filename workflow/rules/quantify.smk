@@ -27,7 +27,7 @@ rule featurecounts:
             -s $strand \
             {params.extra} \
             {input.bam} \
-            2> {output.log}
+            > {log} 2>&1
         mv {output.counts}.summary {output.summary}
         """
 
