@@ -14,12 +14,18 @@ option_list <- list(
   make_option("--output-metadata", type = "character", help = "Output TSV with filtered metadata")
 )
 
-opt <- parse_args(OptionParser(option_list = option_list))
+parser <- OptionParser(option_list = option_list)
+opt <- parse_args(parser)
 
 if (is.null(opt$counts) || is.null(opt$metadata) ||
     is.null(opt$output_rds) || is.null(opt$output_metadata)) {
   stop("All arguments are required", call. = FALSE)
 }
+
+message("[prepare_de_data] counts=", opt$counts,
+        " metadata=", opt$metadata,
+        " output_rds=", opt$output_rds,
+        " output_metadata=", opt$output_metadata)
 
 for (path in c(opt$output_rds, opt$output_metadata)) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
