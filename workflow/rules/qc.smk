@@ -97,11 +97,11 @@ rule infer_strandness_map:
         fq1="results/fastp/{run}.fastp.fastq.gz",
         idx="resources/genome/STAR_index"
     output:
-        aln="results/qc/rseqc/{run}.strand_infer.bam",
-        log="results/qc/rseqc/{run}.strand_infer.Log.out",
-        log_final="results/qc/rseqc/{run}.strand_infer.Log.final.out",
-        unmapped="results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1",
-        sj="results/qc/rseqc/{run}.strand_infer.SJ.out.tab"
+        aln=temp("results/qc/rseqc/{run}.strand_infer.bam"),
+        log=temp("results/qc/rseqc/{run}.strand_infer.Log.out"),
+        log_final=temp("results/qc/rseqc/{run}.strand_infer.Log.final.out"),
+        unmapped=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
+        sj=temp("results/qc/rseqc/{run}.strand_infer.SJ.out.tab")
     params:
         extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
     threads: AUX_THREADS
