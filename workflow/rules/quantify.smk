@@ -7,9 +7,9 @@ rule featurecounts:
         annotation=lambda wildcards: str(Path(config["genome"]["annotation"]).expanduser()),
         strand="results/qc/rseqc/featurecounts_strand.txt"
     output:
-        counts=f"results/counts/counts_exons_{config['project']['name']}.tsv",
-        log=f"results/counts/featureCounts_{config['project']['name']}.log",
-        summary=f"results/counts/counts_exons_{config['project']['name']}.tsv.summary"
+        counts=f"results/counts/counts_exons.tsv",
+        log=f"results/counts/featureCounts.log",
+        summary=f"results/counts/counts_exons.tsv.summary"
     params:
         extra=lambda wildcards: config["processing"].get("featurecounts_extra", "")
     threads: MAX_THREADS
@@ -23,7 +23,7 @@ rule featurecounts:
             -T {threads} \
             -a {input.annotation} \
             -o {output.counts} \
-            -s ${strand} \
+            -s $strand \
             {params.extra} \
             {input.bam} \
             2> {output.log}
@@ -33,9 +33,9 @@ rule featurecounts:
 
 rule compress_counts:
     input:
-        f"results/counts/counts_exons_{config['project']['name']}.tsv"
+        f"results/counts/counts_exons.tsv"
     output:
-        gz=f"results/counts/counts_exons_{config['project']['name']}.tsv.gz"
+        gz=f"results/counts/counts_exons.tsv.gz"
     shell:
         """
         sed 's/.sorted.bam//g' {input} | gzip -c > {output.gz}
