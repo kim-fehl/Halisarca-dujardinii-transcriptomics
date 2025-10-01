@@ -1,0 +1,13 @@
+name: rnaseq-de
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base>=4.2
+  - r-optparse
+  - r-tidyverse
+  - r-cowplot
+  - bioconductor-edger
+  - bioconductor-limma
+  - bioconductor-sva
