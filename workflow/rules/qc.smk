@@ -177,11 +177,26 @@ rule multiqc_fastp:
     input:
         json=expand("results/fastp/{run}.fastp.json", run=RUN_IDS)
     output:
-        "results/qc/multiqc/multiqc_report.html"
+        html="results/qc/multiqc_fastp/multiqc_report.html"
     conda:
         "../envs/pipeline.yaml"
     shell:
         """
-        mkdir -p results/qc/multiqc
-        multiqc results/fastp --outdir results/qc/multiqc --force
+        mkdir -p results/qc/multiqc_fastp
+        multiqc results/fastp --outdir results/qc/multiqc_fastp --force
+        """
+
+
+rule multiqc_fastp_star:
+    input:
+        json=expand("results/fastp/{run}.fastp.json", run=RUN_IDS),
+        star_logs=expand("results/bam/{run}_Log.final.out", run=RUN_IDS)
+    output:
+        html="results/qc/multiqc_fastp_star/multiqc_report.html"
+    conda:
+        "../envs/pipeline.yaml"
+    shell:
+        """
+        mkdir -p results/qc/multiqc_fastp_star
+        multiqc results/fastp results/bam --outdir results/qc/multiqc_fastp_star --force
         """

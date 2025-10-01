@@ -56,5 +56,6 @@ include: "rules/quantify.smk"
 rule all:
     input:
         "results/counts/counts_exons.tsv.gz",
-        "results/qc/multiqc/multiqc_report.html",
+        "results/qc/multiqc_fastp/multiqc_report.html",
+        "results/qc/multiqc_fastp_star/multiqc_report.html",
         "results/qc/rseqc/featurecounts_strand.txt"
