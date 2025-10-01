@@ -55,6 +55,6 @@ include: "rules/quantify.smk"
 
 rule all:
     input:
-        f"results/counts/counts_exons_{config['project']['name']}.tsv.gz",
+        "results/counts/counts_exons.tsv.gz",
         "results/qc/multiqc/multiqc_report.html",
         "results/qc/rseqc/featurecounts_strand.txt"

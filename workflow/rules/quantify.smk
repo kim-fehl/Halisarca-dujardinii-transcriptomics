@@ -4,12 +4,13 @@ from pathlib import Path
 rule featurecounts:
     input:
         bam=expand("results/bam/{run}.sorted.bam", run=RUN_IDS),
-        annotation=lambda wildcards: str(Path(config["genome"]["annotation"]).expanduser()),
+        annotation=config["genome"]["annotation"],
         strand="results/qc/rseqc/featurecounts_strand.txt"
     output:
         counts=f"results/counts/counts_exons.tsv",
-        log=f"results/counts/featureCounts.log",
-        summary=f"results/counts/counts_exons.tsv.summary"
+        summary=f"results/counts/counts_exons.summary.tsv"
+    log:
+        f"logs/featurecounts/featurecounts.log"
     params:
         extra=lambda wildcards: config["processing"].get("featurecounts_extra", "")
     threads: MAX_THREADS
