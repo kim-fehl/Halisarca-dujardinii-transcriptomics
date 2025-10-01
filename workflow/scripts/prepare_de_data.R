@@ -8,24 +8,23 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--counts", type = "character", help = "featureCounts TSV (gzipped)"),
-  make_option("--metadata", type = "character", help = "Sample metadata TSV (UTF-16)"),
-  make_option("--output-rds", type = "character", help = "Output RDS with counts and metadata"),
-  make_option("--output-metadata", type = "character", help = "Output TSV with filtered metadata")
+  make_option("--counts", type = "character", dest = "counts", help = "featureCounts TSV (gzipped)"),
+  make_option("--metadata", type = "character", dest = "metadata", help = "Sample metadata TSV (UTF-16)"),
+  make_option("--output-rds", type = "character", dest = "output_rds", help = "Output RDS with counts and metadata"),
+  make_option("--output-metadata", type = "character", dest = "output_metadata", help = "Output TSV with filtered metadata")
 )
 
 parser <- OptionParser(option_list = option_list)
 opt <- parse_args(parser)
 
+message("[prepare_de_data] raw args: ", paste(commandArgs(trailingOnly = TRUE), collapse = " | "))
+message("[prepare_de_data] parsed options: ")
+str(opt)
+
 if (is.null(opt$counts) || is.null(opt$metadata) ||
     is.null(opt$output_rds) || is.null(opt$output_metadata)) {
   stop("All arguments are required", call. = FALSE)
 }
-
-message("[prepare_de_data] counts=", opt$counts,
-        " metadata=", opt$metadata,
-        " output_rds=", opt$output_rds,
-        " output_metadata=", opt$output_metadata)
 
 for (path in c(opt$output_rds, opt$output_metadata)) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
