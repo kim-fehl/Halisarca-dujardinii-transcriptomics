@@ -10,9 +10,9 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--input-rds", type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
-  make_option("--combat-rds", type = "character", dest = "combat_rds", help = "RDS with ComBat-seq counts"),
-  make_option("--output", type = "character", dest = "output", help = "Output PDF path")
+  make_option(c("-i", "--input-rds"), type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
+  make_option(c("-c", "--combat-rds"), type = "character", dest = "combat_rds", help = "RDS with ComBat-seq counts"),
+  make_option(c("-o", "--output"), type = "character", dest = "output", help = "Output PDF path")
 )
 
 parser <- OptionParser(option_list = option_list)

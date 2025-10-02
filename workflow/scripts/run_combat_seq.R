@@ -6,9 +6,9 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--input-rds", type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
-  make_option("--batch-column", type = "character", dest = "batch_column", default = "season", help = "Metadata column to use as batch"),
-  make_option("--output-rds", type = "character", dest = "output_rds", help = "Output RDS with ComBat-seq adjusted counts")
+  make_option(c("-i", "--input-rds"), type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
+  make_option(c("-b", "--batch-column"), type = "character", dest = "batch_column", default = "season", help = "Metadata column to use as batch"),
+  make_option(c("-o", "--output-rds"), type = "character", dest = "output_rds", help = "Output RDS with ComBat-seq adjusted counts")
 )
 
 parser <- OptionParser(option_list = option_list)

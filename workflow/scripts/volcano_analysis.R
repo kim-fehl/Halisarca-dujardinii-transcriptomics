@@ -9,9 +9,9 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--results", type = "character", dest = "results", help = "edgeR results TSV.gz"),
-  make_option("--mode", type = "character", dest = "mode", help = "Mode: plot or stats"),
-  make_option("--output", type = "character", dest = "output", help = "Output path")
+  make_option(c("-r", "--results"), type = "character", dest = "results", help = "edgeR results TSV.gz"),
+  make_option(c("-m", "--mode"), type = "character", dest = "mode", help = "Mode: plot or stats"),
+  make_option(c("-o", "--output"), type = "character", dest = "output", help = "Output path")
 )
 
 parser <- OptionParser(option_list = option_list)
