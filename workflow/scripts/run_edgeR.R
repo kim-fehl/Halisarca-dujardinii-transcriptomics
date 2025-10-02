@@ -11,11 +11,12 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--input-rds", type = "character", help = "RDS produced by prepare_de_data.R"),
-  make_option("--output-tsv", type = "character", help = "Output TSV.gz with edgeR results")
+  make_option("--input-rds", type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
+  make_option("--output-tsv", type = "character", dest = "output_tsv", help = "Output TSV.gz with edgeR results")
 )
 
-opt <- parse_args(OptionParser(option_list = option_list))
+parser <- OptionParser(option_list = option_list)
+opt <- parse_args(parser)
 
 if (is.null(opt$input_rds) || is.null(opt$output_tsv)) {
   stop("--input-rds and --output-tsv are required", call. = FALSE)

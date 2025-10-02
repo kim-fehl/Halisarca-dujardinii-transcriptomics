@@ -9,12 +9,13 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--results", type = "character", help = "edgeR results TSV.gz"),
-  make_option("--mode", type = "character", help = "Mode: plot or stats"),
-  make_option("--output", type = "character", help = "Output path")
+  make_option("--results", type = "character", dest = "results", help = "edgeR results TSV.gz"),
+  make_option("--mode", type = "character", dest = "mode", help = "Mode: plot or stats"),
+  make_option("--output", type = "character", dest = "output", help = "Output path")
 )
 
-opt <- parse_args(OptionParser(option_list = option_list))
+parser <- OptionParser(option_list = option_list)
+opt <- parse_args(parser)
 
 if (is.null(opt$results) || is.null(opt$mode) || is.null(opt$output)) {
   stop("--results, --mode, and --output are required", call. = FALSE)

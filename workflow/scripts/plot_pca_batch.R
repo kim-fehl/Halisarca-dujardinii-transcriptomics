@@ -10,12 +10,13 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--input-rds", type = "character", help = "RDS produced by prepare_de_data.R"),
-  make_option("--combat-rds", type = "character", help = "RDS with ComBat-seq counts"),
-  make_option("--output", type = "character", help = "Output PDF path")
+  make_option("--input-rds", type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
+  make_option("--combat-rds", type = "character", dest = "combat_rds", help = "RDS with ComBat-seq counts"),
+  make_option("--output", type = "character", dest = "output", help = "Output PDF path")
 )
 
-opt <- parse_args(OptionParser(option_list = option_list))
+parser <- OptionParser(option_list = option_list)
+opt <- parse_args(parser)
 
 if (is.null(opt$input_rds) || is.null(opt$combat_rds) || is.null(opt$output)) {
   stop("--input-rds, --combat-rds, and --output are required", call. = FALSE)

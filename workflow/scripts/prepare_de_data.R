@@ -17,10 +17,6 @@ option_list <- list(
 parser <- OptionParser(option_list = option_list)
 opt <- parse_args(parser)
 
-message("[prepare_de_data] raw args: ", paste(commandArgs(trailingOnly = TRUE), collapse = " | "))
-message("[prepare_de_data] parsed options: ")
-str(opt)
-
 if (is.null(opt$counts) || is.null(opt$metadata) ||
     is.null(opt$output_rds) || is.null(opt$output_metadata)) {
   stop("All arguments are required", call. = FALSE)

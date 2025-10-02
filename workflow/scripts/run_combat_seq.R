@@ -6,12 +6,13 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-  make_option("--input-rds", type = "character", help = "RDS produced by prepare_de_data.R"),
-  make_option("--batch-column", type = "character", default = "season", help = "Metadata column to use as batch"),
-  make_option("--output-rds", type = "character", help = "Output RDS with ComBat-seq adjusted counts")
+  make_option("--input-rds", type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
+  make_option("--batch-column", type = "character", dest = "batch_column", default = "season", help = "Metadata column to use as batch"),
+  make_option("--output-rds", type = "character", dest = "output_rds", help = "Output RDS with ComBat-seq adjusted counts")
 )
 
-opt <- parse_args(OptionParser(option_list = option_list))
+parser <- OptionParser(option_list = option_list)
+opt <- parse_args(parser)
 
 if (is.null(opt$input_rds) || is.null(opt$output_rds)) {
   stop("--input-rds and --output-rds are required", call. = FALSE)
