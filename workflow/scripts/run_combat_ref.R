@@ -46,6 +46,7 @@ if (is.null(repo_dir) || repo_dir == "") {
 
 combat_fn <- NULL
 if (dir.exists(repo_dir)) {
+  script_dir <- normalizePath(repo_dir, winslash = "/", mustWork = FALSE)
   helper_path <- file.path(repo_dir, "helper_seq.R")
   combat_ref_path <- file.path(repo_dir, "Combat_ref.R")
   combat_seq_path <- file.path(repo_dir, "ComBat_seq.R")
