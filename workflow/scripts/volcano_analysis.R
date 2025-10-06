@@ -79,7 +79,7 @@ label_map <- setNames(
     season_name <- if (season %in% names(season_labels)) season_labels[[season]] else season
     condition_name <- if (condition %in% names(condition_labels)) condition_labels[[condition]] else condition
     sprintf(
-      "%s %s vs Body\nup: %d; down: %d; non-sign: %d",
+      "%s %s \nup: %d; down: %d; non-sign: %d",
       season_name,
       condition_name,
       row$up,
@@ -101,7 +101,7 @@ volcano <- ggplot(data, aes(x = logFC, y = -log10(padj_global))) +
   scale_color_manual(values = palette, name = "Direction") +
   geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "grey40") +
   geom_vline(xintercept = c(-lfc_threshold, lfc_threshold), linetype = "dashed", color = "grey40") +
-  facet_wrap(~ contrast, ncol = 4, labeller = as_labeller(label_map)) +
+  facet_wrap(~ contrast, ncol = 2, labeller = as_labeller(label_map)) +
   labs(
     title = "Differential expression volcano plots",
     x = "log2 fold change",
@@ -113,4 +113,4 @@ volcano <- ggplot(data, aes(x = logFC, y = -log10(padj_global))) +
     strip.text = element_text(size = 10)
   )
 
-ggsave(opt$output, volcano, width = 14, height = 7, bg = "white")
+ggsave(opt$output, volcano, width = 7, height = 14, bg = "white")
