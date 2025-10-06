@@ -24,12 +24,10 @@ rule combat_ref_repo:
         """
         set -euo pipefail
         mkdir -p workflow/scripts
-        if [ ! -d workflow/scripts/Combat-ref/.git ]; then
-            git clone --depth 1 https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
-        else
-            git -C workflow/scripts/Combat-ref fetch --depth 1 origin
-            git -C workflow/scripts/Combat-ref reset --hard origin/master
+        if [ -d workflow/scripts/Combat-ref ]; then
+            rm -rf workflow/scripts/Combat-ref
         fi
+        git clone --depth 1 https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
         touch {output.head}
         """
 
