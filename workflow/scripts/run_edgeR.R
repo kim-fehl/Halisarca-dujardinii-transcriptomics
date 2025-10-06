@@ -113,10 +113,9 @@ results_long <- bind_rows(result_tables) %>%
     condition = str_replace(comparison, "_vs_Body", ""),
     logCPM = logCPM,
     logFC = logFC,
-    PValue = PValue,
-    FDR = FDR
+    PValue = PValue
   ) %>%
-  select(gene_id, season, condition, contrast, logFC, logCPM, PValue, FDR, padj_global)
+  select(gene_id, season, condition, contrast, logFC, logCPM, PValue, padj_global)
 
 for (path in c(opt$output_tsv)) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
