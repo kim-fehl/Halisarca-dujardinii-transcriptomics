@@ -27,7 +27,8 @@ rule combat_ref_repo:
         if [ -d workflow/scripts/Combat-ref ]; then
             rm -rf workflow/scripts/Combat-ref
         fi
-        git clone --depth 1 https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
+        git clone --depth 1 --recurse-submodules https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
+        git -C workflow/scripts/Combat-ref submodule update --init --recursive
         touch {output.head}
         """
 

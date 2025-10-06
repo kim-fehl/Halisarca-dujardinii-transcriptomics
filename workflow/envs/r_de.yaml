@@ -8,6 +8,12 @@ dependencies:
   - r-optparse
   - r-tidyverse
   - r-cowplot
+  - r-ggpubr
+  - r-reshape2
+  - r-gridextra
   - bioconductor-edger
   - bioconductor-limma
   - bioconductor-sva
+  - bioconductor-deseq2
+  - bioconductor-ruvseq
+  - bioconductor-batchqc

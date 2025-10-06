@@ -17,6 +17,18 @@ if (is.null(opt$input_rds) || is.null(opt$output_rds)) {
   stop("--input-rds and --output-rds are required", call. = FALSE)
 }
 
+required_pkgs <- c(
+  "sva", "dplyr", "DESeq2", "ggplot2", "reshape2", "gridExtra",
+  "scales", "RUVSeq", "ggpubr", "BatchQC", "edgeR"
+)
+pkg_status <- sapply(required_pkgs, function(pkg) {
+  suppressPackageStartupMessages(require(pkg, character.only = TRUE))
+})
+if (any(!pkg_status)) {
+  missing <- paste(required_pkgs[!pkg_status], collapse = ", ")
+  stop(sprintf("Missing required R packages for ComBat-ref: %s", missing), call. = FALSE)
+}
+
 de_data <- readRDS(opt$input_rds)
 counts <- de_data$counts
 metadata <- de_data$metadata
