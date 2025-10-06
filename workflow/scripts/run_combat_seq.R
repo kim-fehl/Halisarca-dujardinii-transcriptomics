@@ -41,7 +41,7 @@ if (any(counts_matrix < 0)) {
   stop("Counts must be non-negative for ComBat-seq", call. = FALSE)
 }
 
-adjusted_counts <- ComBat_seq(counts = counts_matrix, batch = batch)
+adjusted_counts <- ComBat_seq(counts = counts_matrix, batch = batch, shrink = FALSE)
 
 dir.create(dirname(opt$output_rds), recursive = TRUE, showWarnings = FALSE)
 

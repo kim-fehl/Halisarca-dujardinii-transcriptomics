@@ -46,9 +46,13 @@ if (length(unique(batch)) < 2) {
   stop("ComBat-ref requires at least two batches", call. = FALSE)
 }
 
-group <- droplevels(interaction(metadata$season, metadata$condition, sep = "."))
+if (!"condition" %in% colnames(metadata)) {
+  stop("Metadata must contain 'condition' column for ComBat-ref grouping", call. = FALSE)
+}
+
+group <- droplevels(metadata$condition)
 if (length(unique(group)) < 2) {
-  group <- metadata$condition
+  stop("ComBat-ref requires at least two conditions to use as groups", call. = FALSE)
 }
 
 repo_dir <- opt$repo_dir
