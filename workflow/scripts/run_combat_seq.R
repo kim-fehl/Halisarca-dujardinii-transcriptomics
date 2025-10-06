@@ -7,7 +7,7 @@ suppressPackageStartupMessages({
 
 option_list <- list(
   make_option(c("-i", "--input-rds"), type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
-  make_option(c("-b", "--batch-column"), type = "character", dest = "batch_column", default = "season", help = "Metadata column to use as batch"),
+  make_option(c("-b", "--batch-column"), type = "character", dest = "batch_column", default = "batch", help = "Metadata column to use as batch"),
   make_option(c("-o", "--output-rds"), type = "character", dest = "output_rds", help = "Output RDS with ComBat-seq adjusted counts")
 )
 
@@ -26,15 +26,12 @@ if (is.null(counts) || is.null(metadata)) {
   stop("Input RDS must contain 'counts' matrix and 'metadata' tibble", call. = FALSE)
 }
 
-if (!opt$batch_column %in% colnames(metadata)) {
-  stop(sprintf("Batch column '%s' not found in metadata", opt$batch_column), call. = FALSE)
+batch_col <- opt$batch_column
+if (!batch_col %in% colnames(metadata)) {
+  stop(sprintf("Batch column '%s' not found in metadata", batch_col), call. = FALSE)
 }
 
-batch <- metadata[[opt$batch_column]]
-if (any(is.na(batch))) {
-  stop("Batch column contains NA values", call. = FALSE)
-}
-
+batch <- droplevels(metadata[[batch_col]])
 if (length(unique(batch)) < 2) {
   stop("Batch correction requires at least two batches", call. = FALSE)
 }
@@ -46,8 +43,6 @@ if (any(counts_matrix < 0)) {
 
 adjusted_counts <- ComBat_seq(counts = counts_matrix, batch = batch)
 
-for (path in c(opt$output_rds)) {
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-}
+dir.create(dirname(opt$output_rds), recursive = TRUE, showWarnings = FALSE)
 
 saveRDS(adjusted_counts, file = opt$output_rds)

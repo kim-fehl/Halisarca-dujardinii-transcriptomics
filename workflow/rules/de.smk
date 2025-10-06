@@ -17,6 +17,23 @@ rule prepare_de_data:
         """
 
 
+rule combat_ref_repo:
+    output:
+        head="workflow/scripts/Combat-ref/.git/HEAD"
+    shell:
+        """
+        set -euo pipefail
+        mkdir -p workflow/scripts
+        if [ ! -d workflow/scripts/Combat-ref/.git ]; then
+            git clone --depth 1 https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
+        else
+            git -C workflow/scripts/Combat-ref fetch --depth 1 origin
+            git -C workflow/scripts/Combat-ref reset --hard origin/master
+        fi
+        touch {output.head}
+        """
+
+
 rule combat_seq_counts:
     input:
         rds=rules.prepare_de_data.output.rds
@@ -29,6 +46,23 @@ rule combat_seq_counts:
         Rscript workflow/scripts/run_combat_seq.R \
             --input-rds {input.rds} \
             --output-rds {output.rds}
+        """
+
+
+rule combat_ref_counts:
+    input:
+        rds=rules.prepare_de_data.output.rds,
+        repo=rules.combat_ref_repo.output.head
+    output:
+        rds="results/de/data/combat_ref_counts.rds"
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/run_combat_ref.R \
+            --input-rds {input.rds} \
+            --output-rds {output.rds} \
+            --repo-dir workflow/scripts/Combat-ref
         """
 
 
@@ -50,7 +84,8 @@ rule edgeR_results:
 rule pca_batch_correction:
     input:
         data=rules.prepare_de_data.output.rds,
-        combat=rules.combat_seq_counts.output.rds
+        combat_seq=rules.combat_seq_counts.output.rds,
+        combat_ref=rules.combat_ref_counts.output.rds
     output:
         pdf="results/de/plots/pca_batch_correction.pdf"
     conda:
@@ -59,7 +94,8 @@ rule pca_batch_correction:
         """
         Rscript workflow/scripts/plot_pca_batch.R \
             --input-rds {input.data} \
-            --combat-rds {input.combat} \
+            --combat-seq {input.combat_seq} \
+            --combat-ref {input.combat_ref} \
             --output {output.pdf}
         """
 
