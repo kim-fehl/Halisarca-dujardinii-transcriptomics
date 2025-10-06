@@ -47,18 +47,25 @@ if (is.null(repo_dir) || repo_dir == "") {
 combat_fn <- NULL
 if (dir.exists(repo_dir)) {
   script_dir <- normalizePath(repo_dir, winslash = "/", mustWork = FALSE)
+  safe_source <- function(path) {
+    if (!file.exists(path)) {
+      warning(sprintf("Combat-ref helper missing: %s", path))
+      return(FALSE)
+    }
+    tryCatch({
+      source(path)
+      TRUE
+    }, error = function(e) {
+      warning(sprintf("Failed to source %s: %s", path, conditionMessage(e)))
+      FALSE
+    })
+  }
   helper_path <- file.path(repo_dir, "helper_seq.R")
   combat_ref_path <- file.path(repo_dir, "Combat_ref.R")
   combat_seq_path <- file.path(repo_dir, "ComBat_seq.R")
-  if (file.exists(helper_path)) {
-    source(helper_path)
-  }
-  if (file.exists(combat_seq_path)) {
-    source(combat_seq_path)
-  }
-  if (file.exists(combat_ref_path)) {
-    source(combat_ref_path)
-  }
+  safe_source(helper_path)
+  safe_source(combat_seq_path)
+  safe_source(combat_ref_path)
   if (exists("ComBat_ref", mode = "function")) {
     combat_fn <- get("ComBat_ref")
   }
