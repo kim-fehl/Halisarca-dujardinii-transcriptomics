@@ -55,13 +55,8 @@ df_raw <- calc_pca_df(logcpm_raw, "Raw counts")
 df_combat_seq <- calc_pca_df(logcpm_combat_seq, "ComBat-seq")
 df_combat_ref <- calc_pca_df(logcpm_combat_ref, "ComBat-ref")
 
-season_colors <- c(
-  "Winter" = "#1f78b4",
-  "Spring" = "#33a02c",
-  "Summer" = "#e31a1c",
-  "Autumn" = "#ff7f00"
-)
-condition_shapes <- c("Body" = 16, "Cells" = 17, "Aggregates" = 15)
+season_colors <- c('Winter' = 'dodgerblue', 'Spring' = 'limegreen', 'Summer' = 'magenta', 'Autumn' = 'orange')
+condition_shapes <-  c('Body' = 2, 'Cells' = 0, 'Aggregates' = 1)
 
 plot_panel <- function(df) {
   ggplot(df, aes(x = PC1, y = PC2, color = season, shape = condition)) +
