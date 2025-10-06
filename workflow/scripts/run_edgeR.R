@@ -121,6 +121,7 @@ for (path in c(opt$output_tsv)) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
 }
 
-gz_con <- gzfile(opt$output_tsv, open = "wt")
-write_tsv(results_long, gz_con)
-close(gz_con)
+out_con <- opt$output_tsv
+con <- gzfile(out_con, open = "wb")
+on.exit(close(con))
+write_tsv(results_long, con)
