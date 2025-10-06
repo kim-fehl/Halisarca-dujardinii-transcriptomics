@@ -11,7 +11,9 @@ suppressPackageStartupMessages({
 option_list <- list(
   make_option(c("-r", "--results"), type = "character", dest = "results", help = "edgeR results TSV.gz"),
   make_option(c("-m", "--mode"), type = "character", dest = "mode", help = "Mode: plot or stats"),
-  make_option(c("-o", "--output"), type = "character", dest = "output", help = "Output path")
+  make_option(c("-o", "--output"), type = "character", dest = "output", help = "Output path"),
+  make_option(c("-l", "--lfc-fold"), type = "double", dest = "lfc_fold", default = 1.5, help = "Fold-change threshold applied as log2(fold)"),
+  make_option(c("-f", "--fdr"), type = "double", dest = "fdr_threshold", default = 0.01, help = "FDR significance threshold")
 )
 
 parser <- OptionParser(option_list = option_list)
@@ -25,8 +27,16 @@ mode <- match.arg(opt$mode, choices = c("plot", "stats"))
 
 data <- read_tsv(opt$results, progress = FALSE)
 
-lfc_threshold <- log2(1.5)
-fdr_threshold <- 0.001
+lfc_fold <- ifelse(is.null(opt$lfc_fold), 1.5, opt$lfc_fold)
+if (is.na(lfc_fold) || lfc_fold <= 0) {
+  stop("--lfc-fold must be > 0", call. = FALSE)
+}
+lfc_threshold <- log2(lfc_fold)
+
+fdr_threshold <- ifelse(is.null(opt$fdr_threshold), 0.01, opt$fdr_threshold)
+if (is.na(fdr_threshold) || fdr_threshold <= 0 || fdr_threshold >= 1) {
+  stop("--fdr must be between 0 and 1", call. = FALSE)
+}
 
 season_labels <- c(
   Autumn = "Autumn",

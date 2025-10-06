@@ -13,3 +13,5 @@ processing:
   featurecounts_extra: "-M --fraction -t exon -g Parent"
   infer_experiment_read_limit: 200000
   star_sa_index_n_bases: 12
+  volcano_fold_threshold: 1.5
+  volcano_fdr_threshold: 0.01

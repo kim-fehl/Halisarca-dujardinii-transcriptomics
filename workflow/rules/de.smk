@@ -69,6 +69,9 @@ rule volcano_plot:
         results=rules.edgeR_results.output.tsv
     output:
         png="results/de/plots/volcano_plot.png"
+    params:
+        lfc_fold=lambda wildcards: float(config["processing"].get("volcano_fold_threshold", 1.5)),
+        fdr=lambda wildcards: float(config["processing"].get("volcano_fdr_threshold", 0.01))
     conda:
         "../envs/r_de.yaml"
     shell:
@@ -76,7 +79,9 @@ rule volcano_plot:
         Rscript workflow/scripts/volcano_analysis.R \
             --results {input.results} \
             --mode plot \
-            --output {output.png}
+            --output {output.png} \
+            --lfc-fold {params.lfc_fold} \
+            --fdr {params.fdr}
         """
 
 
@@ -85,6 +90,9 @@ rule volcano_stats:
         results=rules.edgeR_results.output.tsv
     output:
         tsv="results/de/stats/volcano_counts.tsv"
+    params:
+        lfc_fold=lambda wildcards: float(config["processing"].get("volcano_fold_threshold", 1.5)),
+        fdr=lambda wildcards: float(config["processing"].get("volcano_fdr_threshold", 0.01))
     conda:
         "../envs/r_de.yaml"
     shell:
@@ -92,5 +100,7 @@ rule volcano_stats:
         Rscript workflow/scripts/volcano_analysis.R \
             --results {input.results} \
             --mode stats \
-            --output {output.tsv}
+            --output {output.tsv} \
+            --lfc-fold {params.lfc_fold} \
+            --fdr {params.fdr}
         """
