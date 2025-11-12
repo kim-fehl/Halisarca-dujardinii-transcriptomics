@@ -11,6 +11,11 @@ dependencies:
   - r-ggpubr
   - r-reshape2
   - r-gridextra
+  - r-readxl
+  - r-writexl
+  - r-circlize
+  - r-grimport
+  - bioconductor-complexheatmap
   - bioconductor-edger
   - bioconductor-limma
   - bioconductor-sva

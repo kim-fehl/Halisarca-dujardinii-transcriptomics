@@ -139,3 +139,51 @@ rule volcano_stats:
             --lfc-fold {params.lfc_fold} \
             --fdr {params.fdr}
         """
+
+
+rule heatmap_data:
+    input:
+        rds=rules.prepare_de_data.output.rds,
+        results=rules.edgeR_results.output.tsv
+    output:
+        cpm_lfc=HEATMAP_DATA_RDS,
+        sample_stats=HEATMAP_SAMPLE_STATS
+    params:
+        set_name=HEATMAP_SET_NAME
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/prepare_heatmap_inputs.R \
+            --input-rds '{input.rds}' \
+            --edgeR-tsv '{input.results}' \
+            --set-name '{params.set_name}' \
+            --output-rds '{output.cpm_lfc}' \
+            --samples-stats '{output.sample_stats}'
+        """
+
+
+rule heatmap_plot:
+    input:
+        cpm=HEATMAP_DATA_RDS,
+        sample_stats=HEATMAP_SAMPLE_STATS,
+        geneset=lambda wildcards: HEATMAP_GENESET_MAP[wildcards.geneset]["path"]
+    output:
+        pdf=f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}.pdf",
+        xlsx=f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}.xlsx"
+    params:
+        set_name=HEATMAP_SET_NAME,
+        genome=HEATMAP_GENOME_NAME
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/heatmap_4seasons.R \
+            --cpm-rds '{input.cpm}' \
+            --sample-stats '{input.sample_stats}' \
+            --geneset '{input.geneset}' \
+            --set-name '{params.set_name}' \
+            --genome-name '{params.genome}' \
+            --output-pdf '{output.pdf}' \
+            --output-xlsx '{output.xlsx}'
+        """

@@ -3,7 +3,7 @@ project:
   metadata: config/samples_metadata.tsv
 
 genome:
-
+  name: SkHd2
   fasta: resources/genome/SkHd2_genome_21chr_mito_1688unplaced.fasta
   annotation: resources/genome/SkHd2_protein_coding_longest_transcripts.gff3
 
@@ -15,3 +15,7 @@ processing:
   star_sa_index_n_bases: 12
   volcano_fold_threshold: 1.5
   volcano_fdr_threshold: 0.01
+
+genesets:
+  - name: iron_metabolism
+    path: config/genesets/iron_metabolism.xlsx  # update to the actual gene set file

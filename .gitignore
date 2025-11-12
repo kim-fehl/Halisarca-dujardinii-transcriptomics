@@ -1,4 +1,5 @@
-resources/
+resources/*
+!resources/icons/
 logs/
 results/
 workflow/scripts/Combat-ref/
