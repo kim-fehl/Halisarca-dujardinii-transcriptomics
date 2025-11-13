@@ -46,7 +46,8 @@ metadata <- metadata %>%
   mutate(order_index = match(sample_id, colnames(counts))) %>%
   filter(!is.na(order_index)) %>%
   arrange(order_index) %>%
-  select(-order_index)
+  select(-order_index) %>%
+  mutate(sample_group = interaction(season, condition, sep = ".", drop = TRUE))
 
 excluded_autumn3 <- metadata %>%
   filter(season == "Autumn", replicate == 3) %>%
@@ -60,9 +61,10 @@ if (length(excluded_autumn3)) {
 }
 
 counts <- counts[, metadata$sample_id, drop = FALSE]
-metadata <- metadata %>% mutate(sample_id = factor(sample_id, levels = colnames(counts)))
+metadata <- metadata %>%
+  mutate(sample_id = factor(sample_id, levels = colnames(counts)))
 
-sample_group <- interaction(metadata$season, metadata$condition, sep = ".", drop = TRUE)
+sample_group <- metadata$sample_group
 
 dgl <- DGEList(counts = counts)
 keep <- filterByExpr(dgl, group = sample_group)
@@ -77,7 +79,7 @@ sample_stats <- metadata %>%
     sample = as.character(sample_id),
     season = as.character(season),
     condition = as.character(condition),
-    group = as.character(interaction(season, condition, sep = ".")),
+    sample_group = as.character(sample_group),
     replicate = replicate,
     hpd = hpd
   ) %>%

@@ -22,7 +22,7 @@ The dataset (NCBI BioProject PRJNA594150) contains _H. dujardinii_ bulk RNA-seq 
 - Sample metadata (`config/samples_metadata.tsv`)
 - Genome FASTA/GFF3 resources under `resources/genome/`, as referenced in `config/config.yaml`
 - Raw reads accessible to the workflow (downloaded automatically from NCBI)
-- Gene-set `*.xlsx` tables whose paths are listed under `heatmap.genesets`; each sheet must provide `group` (may be blank), `gene_id`, `name`, and `descr`
+- Gene-set `*.xlsx` tables whose paths are listed under `genesets`; each sheet must provide `group` (may be blank), `gene_id`, `name`, and `descr`
 
 ## Quick start
 

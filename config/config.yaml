@@ -17,5 +17,5 @@ processing:
   volcano_fdr_threshold: 0.01
 
 genesets:
-  - name: iron_metabolism
-    path: config/genesets/iron_metabolism.xlsx  # update to the actual gene set file
+  - name: heatshocks
+    path: config/genesets/hd_heatshocks_SkHd2.xlsx  # update to the actual gene set file

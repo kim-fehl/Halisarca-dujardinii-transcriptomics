@@ -59,13 +59,18 @@ hm_tiss_color_pal <- colorRamp2(c(0, 3, 4), c("#000000", "#17ffc6", "#baffee"))
 name_column <- "name"
 descr_column <- "descr"
 gene_id_column <- "gene_id"
-group_column <- "group"
+gene_group_column <- "group" # column in gene set XLSX defining heatmap categories
 
 df_cpm_table <- read_rds(opt$cpm_rds)
-df_samples_stats_all <- read_tsv(opt$sample_stats, show_col_types = FALSE) %>%
-  rename(sample_group = group)
+df_samples_stats_all <- read_tsv(opt$sample_stats, show_col_types = FALSE)
 
-required_gene_cols <- c(name_column, descr_column, gene_id_column, group_column)
+required_sample_cols <- c("sample", "sample_group")
+missing_sample_cols <- setdiff(required_sample_cols, colnames(df_samples_stats_all))
+if (length(missing_sample_cols)) {
+  stop(sprintf("Sample stats file must contain columns: %s", paste(required_sample_cols, collapse = ", ")), call. = FALSE)
+}
+
+required_gene_cols <- c(name_column, descr_column, gene_id_column, gene_group_column)
 df_geneset_raw <- read_excel(opt$geneset)
 if (!all(required_gene_cols %in% colnames(df_geneset_raw))) {
   stop(sprintf("Gene set file must contain columns: %s", paste(required_gene_cols, collapse = ", ")), call. = FALSE)
@@ -73,7 +78,7 @@ if (!all(required_gene_cols %in% colnames(df_geneset_raw))) {
 
 df_geneset <- df_geneset_raw %>%
   select(all_of(required_gene_cols)) %>%
-  mutate(!!group_column := if_else(is.na(.data[[group_column]]), " ", as.character(.data[[group_column]])))
+  mutate(!!gene_group_column := if_else(is.na(.data[[gene_group_column]]), " ", as.character(.data[[gene_group_column]])))
 
 if (!"gene_id" %in% colnames(df_cpm_table)) {
   stop("CPM table must contain a 'gene_id' column", call. = FALSE)
@@ -87,21 +92,21 @@ if (!length(sample_columns)) {
 d <- inner_join(df_geneset, df_cpm_table, by = setNames("gene_id", gene_id_column))
 
 sample_long <- d %>%
-  select(all_of(c(name_column, group_column, sample_columns))) %>%
+  select(all_of(c(name_column, gene_group_column, sample_columns))) %>%
   pivot_longer(cols = all_of(sample_columns), names_to = "sample", values_to = "CPM") %>%
   inner_join(df_samples_stats_all, by = "sample") %>%
   mutate(sample_group = if_else(!is.na(sample_group), sample_group, paste(season, condition, sep = ".")))
 
 mean_cpm <- sample_long %>%
-  group_by_at(c(name_column, group_column, "sample_group")) %>%
+  group_by_at(c(name_column, gene_group_column, "sample_group")) %>%
   summarize(mean_CPM = mean(CPM, na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(id_cols = all_of(c(name_column, group_column)), names_from = sample_group, names_prefix = "mean_CPM.", values_from = mean_CPM)
+  pivot_wider(id_cols = all_of(c(name_column, gene_group_column)), names_from = sample_group, names_prefix = "mean_CPM.", values_from = mean_CPM)
 
 if (!nrow(mean_cpm)) {
   stop("Unable to derive mean CPM values", call. = FALSE)
 }
 
-d <- inner_join(d, mean_cpm, by = c(name_column, group_column))
+d <- inner_join(d, mean_cpm, by = c(name_column, gene_group_column))
 
 body_mean_cols <- paste0("mean_CPM.", season_levels, ".Body")
 body_mean_cols_present <- intersect(body_mean_cols, colnames(d))
@@ -167,7 +172,7 @@ ann_img <- HeatmapAnnotation(
   show_annotation_name = FALSE
 )
 
-group_factor <- factor(d[[group_column]], levels = str_sort(unique(d[[group_column]]), numeric = TRUE))
+group_factor <- factor(d[[gene_group_column]], levels = str_sort(unique(d[[gene_group_column]]), numeric = TRUE))
 
 hm_means <- Heatmap(
   mx_log10means_tiss_CPM,
