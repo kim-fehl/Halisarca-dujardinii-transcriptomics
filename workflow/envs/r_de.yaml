@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - r-base>=4.2
+  - ghostscript
   - r-optparse
   - r-tidyverse
   - r-cowplot

@@ -45,6 +45,11 @@ missing_icons <- names(icon_paths)[!nzchar(icon_paths) | !file.exists(icon_paths
 if (length(missing_icons)) {
   stop(sprintf("Missing icon files for: %s. Update config.heatmap.icons to point to existing PDFs.", paste(missing_icons, collapse = ", ")), call. = FALSE)
 }
+ghostscript_path <- Sys.which("gs")
+use_icon_annotation <- nzchar(ghostscript_path)
+if (!use_icon_annotation) {
+  message("Ghostscript 'gs' not found; using color bars in place of icon annotations.")
+}
 
 options(repr.plot.res = 200, warn = -1)
 set_name <- opt$set_name
@@ -87,6 +92,7 @@ if (geneset_group_source %in% colnames(df_geneset_raw)) {
 
 df_geneset <- df_geneset_raw %>%
   select(all_of(c(required_gene_cols, gene_group_column))) %>%
+  mutate(!!name_column := make.unique(as.character(.data[[name_column]]), sep = "_dup")) %>%
   mutate(!!gene_group_column := if_else(is.na(.data[[gene_group_column]]) | !nzchar(.data[[gene_group_column]]),
                                         " ",
                                         as.character(.data[[gene_group_column]])))
@@ -173,15 +179,24 @@ total_height_inch <- min(1500,(nrow(mx_lfc) * hm_cell_height_mm + extra_height_m
 
 ann_gene_names <- rowAnnotation(gene = anno_text(rownames(mx_log10means_tiss_CPM), gp = gpar(fontsize = 8)))
 
-image_pdf <- rep(icon_paths[["intact"]], length.out = ncol(mx_log10means_tiss_CPM))
 body_color_keys <- str_replace(colnames(mx_log10means_tiss_CPM), "^mean_CPM.([^.]+).*", "\\1")
 body_colors <- season_colors[body_color_keys]
 names(body_colors) <- colnames(mx_log10means_tiss_CPM)
 
-ann_img <- HeatmapAnnotation(
-  img = anno_image(image_pdf, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
-  show_annotation_name = FALSE
-)
+if (use_icon_annotation) {
+  image_pdf <- rep(icon_paths[["intact"]], length.out = ncol(mx_log10means_tiss_CPM))
+  ann_img <- HeatmapAnnotation(
+    img = anno_image(image_pdf, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
+    show_annotation_name = FALSE
+  )
+} else {
+  ann_img <- HeatmapAnnotation(
+    season = body_color_keys,
+    col = list(season = season_colors),
+    show_annotation_name = FALSE,
+    annotation_legend_param = list(title = "Season", title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 7))
+  )
+}
 
 group_factor <- factor(d[[gene_group_column]], levels = str_sort(unique(d[[gene_group_column]]), numeric = TRUE))
 
