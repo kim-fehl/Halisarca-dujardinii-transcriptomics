@@ -43,10 +43,22 @@ stopifnot(file.exists(opt$geneset))
 icon_paths <- c(intact = 'resources/icons/sponge_icons_t.pdf', cells = 'resources/icons/sponge_icons_c.pdf', aggregates = 'resources/icons/sponge_icons_a.pdf')
 missing_icons <- names(icon_paths)[!nzchar(icon_paths) | !file.exists(icon_paths)]
 if (length(missing_icons)) {
-  stop(sprintf("Missing icon files for: %s. Update config.heatmap.icons to point to existing PDFs.", paste(missing_icons, collapse = ", ")), call. = FALSE)
+  stop(sprintf("Missing icon files for: %s. Check resources/icons/", paste(missing_icons, collapse = ", ")), call. = FALSE)
 }
-if (!nzchar(Sys.which("gs"))) {
+icon_paths <- setNames(
+  vapply(icon_paths, function(path) {
+    normalizePath(path, winslash = "/", mustWork = TRUE)
+  }, character(1), USE.NAMES = FALSE),
+  names(icon_paths)
+)
+gs_path <- Sys.which("gs")
+if (!nzchar(gs_path)) {
   message("Ghostscript 'gs' not detected in PATH; icon annotations may fall back to color bars.")
+} else {
+  current_gs <- Sys.getenv("R_GSCMD", unset = "")
+  if (!nzchar(current_gs) || current_gs != gs_path) {
+    Sys.setenv(R_GSCMD = gs_path)
+  }
 }
 
 options(repr.plot.res = 200, warn = -1)
