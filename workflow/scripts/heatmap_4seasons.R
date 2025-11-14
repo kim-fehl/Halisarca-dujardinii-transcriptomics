@@ -45,10 +45,8 @@ missing_icons <- names(icon_paths)[!nzchar(icon_paths) | !file.exists(icon_paths
 if (length(missing_icons)) {
   stop(sprintf("Missing icon files for: %s. Update config.heatmap.icons to point to existing PDFs.", paste(missing_icons, collapse = ", ")), call. = FALSE)
 }
-ghostscript_path <- Sys.which("gs")
-use_icon_annotation <- nzchar(ghostscript_path)
-if (!use_icon_annotation) {
-  message("Ghostscript 'gs' not found; using color bars in place of icon annotations.")
+if (!nzchar(Sys.which("gs"))) {
+  message("Ghostscript 'gs' not detected in PATH; icon annotations may fall back to color bars.")
 }
 
 options(repr.plot.res = 200, warn = -1)
@@ -160,9 +158,13 @@ season_order <- season_levels[season_levels %in% lfc_meta$season]
 if (!length(season_order)) {
   stop("No recognized seasons found in logFC columns", call. = FALSE)
 }
+condition_order <- c("Cells", "Aggregates")
 lfc_meta <- lfc_meta %>%
-  mutate(season_factor = factor(season, levels = season_order)) %>%
-  arrange(season_factor, condition)
+  mutate(
+    season_factor = factor(season, levels = season_order),
+    condition_factor = factor(condition, levels = condition_order)
+  ) %>%
+  arrange(season_factor, condition_factor)
 
 mx_lfc <- mx_lfc[, lfc_meta$column, drop = FALSE]
 mx_fdr <- mx_fdr[, gsub("^logFC_", "adjP_", lfc_meta$column), drop = FALSE]
@@ -183,20 +185,25 @@ body_color_keys <- str_replace(colnames(mx_log10means_tiss_CPM), "^mean_CPM.([^.
 body_colors <- season_colors[body_color_keys]
 names(body_colors) <- colnames(mx_log10means_tiss_CPM)
 
-if (use_icon_annotation) {
-  image_pdf <- rep(icon_paths[["intact"]], length.out = ncol(mx_log10means_tiss_CPM))
-  ann_img <- HeatmapAnnotation(
-    img = anno_image(image_pdf, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
-    show_annotation_name = FALSE
-  )
-} else {
-  ann_img <- HeatmapAnnotation(
-    season = body_color_keys,
+create_season_bar_annotation <- function(keys) {
+  HeatmapAnnotation(
+    season = keys,
     col = list(season = season_colors),
     show_annotation_name = FALSE,
     annotation_legend_param = list(title = "Season", title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 7))
   )
 }
+
+ann_img <- tryCatch({
+  image_pdf <- rep(icon_paths[["intact"]], length.out = ncol(mx_log10means_tiss_CPM))
+  HeatmapAnnotation(
+    img = anno_image(image_pdf, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
+    show_annotation_name = FALSE
+  )
+}, error = function(e) {
+  message("Icon annotation failed (", conditionMessage(e), "); falling back to color bars.")
+  create_season_bar_annotation(body_color_keys)
+})
 
 group_factor <- factor(d[[gene_group_column]], levels = str_sort(unique(d[[gene_group_column]]), numeric = TRUE))
 
@@ -233,10 +240,27 @@ lfc_image_files <- ifelse(lfc_meta$condition == "Cells", icon_paths[["cells"]], 
 season_colors_lfc <- season_colors[lfc_meta$season]
 names(season_colors_lfc) <- lfc_meta$column
 
-ann_img_lfc <- HeatmapAnnotation(
-  img = anno_image(lfc_image_files, border = FALSE, gp = gpar(fill = season_colors_lfc, col = NA)),
-  show_annotation_name = FALSE
-)
+ann_img_lfc <- tryCatch({
+  HeatmapAnnotation(
+    img = anno_image(lfc_image_files, border = FALSE, gp = gpar(fill = season_colors_lfc, col = NA)),
+    show_annotation_name = FALSE
+  )
+}, error = function(e) {
+  message("LFC icon annotation failed (", conditionMessage(e), "); using color bars instead.")
+  HeatmapAnnotation(
+    season = factor(lfc_meta$season, levels = season_levels),
+    condition = factor(lfc_meta$condition, levels = c("Cells", "Aggregates")),
+    col = list(
+      season = season_colors,
+      condition = c("Cells" = "#5B8FF9", "Aggregates" = "#FFAF00")
+    ),
+    show_annotation_name = FALSE,
+    annotation_legend_param = list(
+      season = list(title = "Season", title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 7)),
+      condition = list(title = "Condition", title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 7))
+    )
+  )
+})
 
 hm_lfc <- Heatmap(
   mx_lfc,
