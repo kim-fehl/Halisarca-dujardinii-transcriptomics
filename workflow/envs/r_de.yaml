@@ -16,6 +16,7 @@ dependencies:
   - r-writexl
   - r-circlize
   - r-grimport
+  - r-magick
   - bioconductor-complexheatmap
   - bioconductor-edger
   - bioconductor-limma

@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(ggplot2)
   library(grImport)
+  library(magick)
   library(RColorBrewer)
   library(readr)
   library(readxl)
@@ -51,6 +52,20 @@ icon_paths <- setNames(
   }, character(1), USE.NAMES = FALSE),
   names(icon_paths)
 )
+read_icon_raster <- function(path) {
+  img <- magick::image_read(path)
+  img <- magick::image_background(img, color = "transparent")
+  as.raster(img)
+}
+icon_rasters <- lapply(icon_paths, function(path) {
+  tryCatch(read_icon_raster(path), error = function(e) NULL)
+})
+missing_icon_rasters <- names(icon_rasters)[vapply(icon_rasters, is.null, logical(1))]
+if (length(missing_icon_rasters)) {
+  warning(sprintf("Unable to load icon rasters for: %s; annotations may fall back to color bars.", paste(missing_icon_rasters, collapse = ", ")))
+}
+use_icon_annotation_means <- !is.null(icon_rasters[["intact"]])
+use_icon_annotation_lfc <- all(!vapply(icon_rasters[c("cells", "aggregates")], is.null, logical(1)))
 gs_path <- Sys.which("gs")
 if (!nzchar(gs_path)) {
   message("Ghostscript 'gs' not detected in PATH; icon annotations may fall back to color bars.")
@@ -206,16 +221,15 @@ create_season_bar_annotation <- function(keys) {
   )
 }
 
-ann_img <- tryCatch({
-  image_pdf <- rep(icon_paths[["intact"]], length.out = ncol(mx_log10means_tiss_CPM))
-  HeatmapAnnotation(
-    img = anno_image(image_pdf, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
+if (use_icon_annotation_means) {
+  image_icons <- rep(list(icon_rasters[["intact"]]), length.out = ncol(mx_log10means_tiss_CPM))
+  ann_img <- HeatmapAnnotation(
+    img = anno_image(image_icons, border = FALSE, gp = gpar(fill = body_colors, col = NA)),
     show_annotation_name = FALSE
   )
-}, error = function(e) {
-  message("Icon annotation failed (", conditionMessage(e), "); falling back to color bars.")
-  create_season_bar_annotation(body_color_keys)
-})
+} else {
+  ann_img <- create_season_bar_annotation(body_color_keys)
+}
 
 group_factor <- factor(d[[gene_group_column]], levels = str_sort(unique(d[[gene_group_column]]), numeric = TRUE))
 
@@ -248,18 +262,20 @@ hm_means <- Heatmap(
   )
 )
 
-lfc_image_files <- ifelse(lfc_meta$condition == "Cells", icon_paths[["cells"]], icon_paths[["aggregates"]])
 season_colors_lfc <- season_colors[lfc_meta$season]
 names(season_colors_lfc) <- lfc_meta$column
 
-ann_img_lfc <- tryCatch({
-  HeatmapAnnotation(
-    img = anno_image(lfc_image_files, border = FALSE, gp = gpar(fill = season_colors_lfc, col = NA)),
+if (use_icon_annotation_lfc) {
+  lfc_image_icons <- lapply(lfc_meta$condition, function(cond) {
+    icon_name <- tolower(cond)
+    icon_rasters[[icon_name]]
+  })
+  ann_img_lfc <- HeatmapAnnotation(
+    img = anno_image(lfc_image_icons, border = FALSE, gp = gpar(fill = season_colors_lfc, col = NA)),
     show_annotation_name = FALSE
   )
-}, error = function(e) {
-  message("LFC icon annotation failed (", conditionMessage(e), "); using color bars instead.")
-  HeatmapAnnotation(
+} else {
+  ann_img_lfc <- HeatmapAnnotation(
     season = factor(lfc_meta$season, levels = season_levels),
     condition = factor(lfc_meta$condition, levels = c("Cells", "Aggregates")),
     col = list(
@@ -272,7 +288,7 @@ ann_img_lfc <- tryCatch({
       condition = list(title = "Condition", title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 7))
     )
   )
-})
+}
 
 hm_lfc <- Heatmap(
   mx_lfc,
