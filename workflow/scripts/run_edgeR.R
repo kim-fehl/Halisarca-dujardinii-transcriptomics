@@ -58,7 +58,7 @@ group <- droplevels(interaction(metadata$season, metadata$condition, sep = "."))
 design <- model.matrix(~0 + group)
 colnames(design) <- levels(group)
 
-contrast_exprs <- c()
+contrast_exprs <- setNames(character(0), character(0))
 
 seasons <- levels(metadata$season)
 for (season in seasons) {
@@ -79,7 +79,13 @@ if (length(contrast_exprs) == 0) {
   stop("No valid contrasts could be constructed", call. = FALSE)
 }
 
+contrast_names <- names(contrast_exprs)
 contrasts <- makeContrasts(contrasts = contrast_exprs, levels = design)
+if (!is.null(contrast_names) && length(contrast_names) == ncol(contrasts)) {
+  colnames(contrasts) <- contrast_names
+} else if (is.null(colnames(contrasts))) {
+  stop("Unable to name contrasts matrix; ensure contrast definitions are named.", call. = FALSE)
+}
 
 fit <- glmQLFit(dge, design, robust = TRUE)
 
