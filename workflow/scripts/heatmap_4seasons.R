@@ -59,7 +59,8 @@ hm_tiss_color_pal <- colorRamp2(c(0, 3, 4), c("#000000", "#17ffc6", "#baffee"))
 name_column <- "name"
 descr_column <- "descr"
 gene_id_column <- "gene_id"
-gene_group_column <- "group" # column in gene set XLSX defining heatmap categories
+geneset_group_source <- "group" # source column name in gene set XLSX
+gene_group_column <- "heatmap_group"
 
 df_cpm_table <- read_rds(opt$cpm_rds)
 df_samples_stats_all <- read_tsv(opt$sample_stats, show_col_types = FALSE)
@@ -75,14 +76,20 @@ df_geneset_raw <- read_excel(opt$geneset)
 if (!all(required_gene_cols %in% colnames(df_geneset_raw))) {
   stop(sprintf("Gene set file must contain columns: %s", paste(required_gene_cols, collapse = ", ")), call. = FALSE)
 }
-if (!gene_group_column %in% colnames(df_geneset_raw)) {
+if (geneset_group_source %in% colnames(df_geneset_raw)) {
+  df_geneset_raw <- df_geneset_raw %>%
+    mutate(!!geneset_group_source := as.character(.data[[geneset_group_source]])) %>%
+    rename(!!gene_group_column := all_of(geneset_group_source))
+} else {
   df_geneset_raw <- df_geneset_raw %>%
     mutate(!!gene_group_column := NA_character_)
 }
 
 df_geneset <- df_geneset_raw %>%
   select(all_of(c(required_gene_cols, gene_group_column))) %>%
-  mutate(!!gene_group_column := if_else(is.na(.data[[gene_group_column]]), " ", as.character(.data[[gene_group_column]])))
+  mutate(!!gene_group_column := if_else(is.na(.data[[gene_group_column]]) | !nzchar(.data[[gene_group_column]]),
+                                        " ",
+                                        as.character(.data[[gene_group_column]])))
 
 if (!"gene_id" %in% colnames(df_cpm_table)) {
   stop("CPM table must contain a 'gene_id' column", call. = FALSE)
