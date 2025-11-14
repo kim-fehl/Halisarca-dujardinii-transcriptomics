@@ -70,14 +70,18 @@ if (length(missing_sample_cols)) {
   stop(sprintf("Sample stats file must contain columns: %s", paste(required_sample_cols, collapse = ", ")), call. = FALSE)
 }
 
-required_gene_cols <- c(name_column, descr_column, gene_id_column, gene_group_column)
+required_gene_cols <- c(name_column, descr_column, gene_id_column)
 df_geneset_raw <- read_excel(opt$geneset)
 if (!all(required_gene_cols %in% colnames(df_geneset_raw))) {
   stop(sprintf("Gene set file must contain columns: %s", paste(required_gene_cols, collapse = ", ")), call. = FALSE)
 }
+if (!gene_group_column %in% colnames(df_geneset_raw)) {
+  df_geneset_raw <- df_geneset_raw %>%
+    mutate(!!gene_group_column := NA_character_)
+}
 
 df_geneset <- df_geneset_raw %>%
-  select(all_of(required_gene_cols)) %>%
+  select(all_of(c(required_gene_cols, gene_group_column))) %>%
   mutate(!!gene_group_column := if_else(is.na(.data[[gene_group_column]]), " ", as.character(.data[[gene_group_column]])))
 
 if (!"gene_id" %in% colnames(df_cpm_table)) {
