@@ -16,10 +16,10 @@ Nextflow DSL2 scaffold for alternative splicing analyses on genome-aligned paire
 - `condition` ← `BiologicalState`
 - `strandedness` ← `Stranded` (expects `RF` or `FR`; falls back to `params.strandedness`)
 - `readlen` ← `ReadLength` (used to pick/build STAR indices)
-- `bam` (optional) ← `${params.bam_dir}/${Run}.bam` unless an explicit `bam` column is present
+- `bam` (optional) ← `${params.bam_dir}/${Run}.bam` unless an explicit `bam` column is present (default `results/bam`)
 - `precomputed GTF` (optional) ← `${params.stringtie_dir}/${Run}.gtf` unless an explicit `gtf` column is present
 
-If you want to skip work for some samples, drop ready BAMs into `resources/bam/<Run>.bam` (with `.bai`) and optional per-run StringTie GTFs into `resources/stringtie/<Run>.gtf`. The pipeline will reuse them and only download/align the remaining runs.
+If you want to skip work for some samples, drop ready BAMs into `results/bam/<Run>.bam` (with `.bai`) and optional per-run StringTie GTFs into `resources/stringtie/<Run>.gtf`. The pipeline will reuse them and only download/align the remaining runs. You can change `--bam_dir` if you prefer another location.
 
 ## Running
 Update `gtf` and `fasta` (reference) in `nextflow.config` or via `-params-file` and launch:
