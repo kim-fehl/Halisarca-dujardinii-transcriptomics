@@ -1,6 +1,6 @@
-resources/*
-config/genesets/
-!resources/icons/
-logs/
-results/
-workflow/scripts/Combat-ref/
+differential_expression/resources/*
+differential_expression/config/genesets/
+!differential_expression/resources/icons/
+differential_expression/logs/
+differential_expression/results/
+differential_expression/workflow/scripts/Combat-ref/
