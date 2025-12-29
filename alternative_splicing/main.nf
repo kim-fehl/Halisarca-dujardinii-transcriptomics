@@ -54,7 +54,8 @@ workflow {
 
     // Split samples into those with precomputed BAMs vs. those needing alignment
     def branched = samples_ch.branch { sid, cond, bam, strand, gtf, readlen ->
-        bam && bam.exists() ? 'prealigned' : 'needs_alignment'
+        prealigned: bam && bam.exists()
+        needs_alignment: !(bam && bam.exists())
     }
 
     prealigned_ch = branched.prealigned.map { sid, cond, bam, strand, gtf, readlen ->
@@ -178,7 +179,7 @@ process STAR_INDEX {
     script:
     """
     set -euo pipefail
-    overhang=$(( ${readlen} - 1 ))
+    overhang=\$(( ${readlen} - 1 ))
     idx="${params.star_index_base}/${readlen}"
     mkdir -p "$idx"
 
