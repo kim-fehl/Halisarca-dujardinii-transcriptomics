@@ -166,6 +166,7 @@ process FASTP {
 process STAR_INDEX {
     tag { readlen }
     cpus params.threads
+    storeDir "${params.star_index_base}/readlen_${readlen}"
 
     input:
         val readlen
@@ -177,31 +178,20 @@ process STAR_INDEX {
         params.fasta && params.gtf
 
     script:
+    def readlen_val = readlen as Integer
+    def overhang = readlen_val - 1
     """
     set -euo pipefail
-    overhang=\$(( ${readlen} - 1 ))
-    idx="${params.star_index_base}/${readlen}"
-    mkdir -p "$idx"
-
-    if [[ -s "$idx/SAindex" ]]; then
-      echo "[INFO] Reusing STAR index for read length ${readlen} at $idx"
-      echo "$idx" > index.path
-      ln -s "$idx" .
-      exit 0
-    fi
-
     ulimit -n 65536
-    echo "[INFO] Building STAR index for read length ${readlen} at $idx"
+    echo "[INFO] Building STAR index for read length ${readlen_val}"
     STAR \\
       --runThreadN ${task.cpus} \\
       --runMode genomeGenerate \\
-      --genomeDir "$idx" \\
+      --genomeDir "star_index" \\
       --genomeFastaFiles "${params.fasta}" \\
       --sjdbGTFfile "${params.gtf}" \\
-      --sjdbOverhang "$overhang" \\
+      --sjdbOverhang ${overhang} \\
       --genomeSAindexNbases 12
-
-    ln -s "$idx" star_index
     """
 }
 
