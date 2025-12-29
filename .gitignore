@@ -4,3 +4,10 @@ differential_expression/config/genesets/
 differential_expression/logs/
 differential_expression/results/
 differential_expression/workflow/scripts/Combat-ref/
+alternative_splicing/results/
+alternative_splicing/logs/
+alternative_splicing/work/
+alternative_splicing/.nextflow*
+alternative_splicing/resources/bam/
+alternative_splicing/resources/stringtie/
+alternative_splicing/resources/star_index/
