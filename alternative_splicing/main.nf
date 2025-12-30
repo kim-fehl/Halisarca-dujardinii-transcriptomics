@@ -78,6 +78,10 @@ workflow {
         .join(sheet_ch)
         .map { exp, run, cond, strand, readlen, r1, r2 -> tuple(run, cond, strand, readlen, r1, r2) }
 
+    samples_with_fastq
+        .map { run, cond, strand, readlen, r1, r2 -> "${run}\t${cond}\t${strand}\t${readlen}\t${r1}\t${r2}" }
+        .collectFile(name: "joined_samples.tsv", newLine: true, storeDir: "${params.outdir}", overwrite: true)
+
     align_input_ch = samples_with_fastq.map { sid, cond, strand, readlen, r1, r2 ->
         if (!readlen) {
             error "ReadLength is required for ${sid}"
@@ -96,21 +100,30 @@ workflow {
     trimmed      = fastp_step.reads
 
     // Match trimmed reads to the correct STAR index by read length
-    trimmed_keyed = trimmed.map { sid, cond, strand, readlen, r1, r2 ->
-        tuple(readlen, sid, cond, strand, r1, r2)
-    }
-    alignment_ch = STAR_ALIGN(trimmed_keyed.join(star_indices)).aligned_bam
+    trimmed_grouped = trimmed
+        .map { sid, cond, strand, readlen, r1, r2 -> tuple(readlen, tuple(sid, cond, strand, r1, r2)) }
+        .groupTuple()
+
+    aligned_input = trimmed_grouped.join(star_indices)
+        .flatMap { readlen, samples, index_dir ->
+            samples.collect { sample ->
+                def (sid, cond, strand, r1, r2) = sample
+                tuple(readlen, sid, cond, strand, r1, r2, index_dir)
+            }
+        }
+
+    alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
 
     junctions     = REGTOOLS_JUNCTIONS(alignment_ch.map { sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
     assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
-    merged_gtf    = STRINGTIE_MERGE(assemblies.out.assembled_gtf)
-    comparison    = GFFCOMPARE(merged_gtf.out.merged_gtf)
+    merged_gtf    = STRINGTIE_MERGE(assemblies)
+    comparison    = GFFCOMPARE(merged_gtf)
     junction_sets = LEAFCUTTER_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
     rmats_events  = RMATS_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
 
-    transcriptome = BUILD_TRANSCRIPTOME(merged_gtf.out.merged_gtf, params.fasta)
+    transcriptome = BUILD_TRANSCRIPTOME(merged_gtf, params.fasta)
     salmon_inputs = alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) }
-                                .combine(transcriptome.out.transcript_fasta)
+                                .combine(transcriptome)
     quant         = SALMON_QUANT(salmon_inputs)
 }
 
@@ -190,21 +203,20 @@ process STAR_ALIGN {
     script:
     """
     set -euo pipefail
-    prefix="${sample_id}."
     ulimit -n 65536
     STAR \\
       --runThreadN ${task.cpus} \\
       --genomeDir ${index_dir} \\
       --readFilesIn ${r1} ${r2} \\
       --readFilesCommand zcat \\
-      --outFileNamePrefix "$prefix" \\
+      --outFileNamePrefix "${sample_id}." \\
       --outSAMtype BAM SortedByCoordinate \\
       --outSAMstrandField intronMotif \\
       --alignIntronMax 50000 \\
       --alignMatesGapMax 50000 \\
       --outFilterMismatchNoverLmax 0.04 \\
       --twopassMode Basic
-    mv "${prefix}Aligned.sortedByCoord.out.bam" "${sample_id}.bam"
+    mv "${sample_id}.Aligned.sortedByCoord.out.bam" "${sample_id}.bam"
     samtools index -@ ${task.cpus} "${sample_id}.bam"
     """
 }
