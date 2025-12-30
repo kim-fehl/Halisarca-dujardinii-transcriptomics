@@ -70,5 +70,5 @@ Outputs land under `results/` and `logs/`. Swap `-profile` once you add HPC/clou
 ## Requirements
 - SRA Toolkit (`prefetch`/`fasterq-dump`), `fastp`, `STAR`, `samtools`, `stringtie`
 - `regtools` for junction extraction, `ggsashimi` for sashimi plots
-- `pyranges` (via conda) for resolving GOI regions from GTF/GFF
+- `gtfparse` (via conda) for resolving GOI regions from GTF/GFF
 - Reference FASTA/GTF set via `--fasta` / `--gtf`

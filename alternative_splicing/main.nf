@@ -143,7 +143,7 @@ workflow {
 
     alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
 
-    junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
+    //junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
     assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
     merged_gtf    = STRINGTIE_MERGE(assemblies)
     comparison    = GFFCOMPARE(merged_gtf)
@@ -161,7 +161,7 @@ workflow {
             .collectFile(name: "bam_manifest.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
-        sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs)
+        sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs.view { "sashimi: ${it}" } )
     }
 }
 
@@ -435,7 +435,7 @@ process GGSASHIMI_PLOT {
 
 process RESOLVE_GOI {
     publishDir "${params.outdir}/sashimi", mode: 'copy'
-    conda "envs/pyranges.yml"
+    conda "envs/gtfparse.yml"
 
     input:
         path goi_tsv
@@ -450,7 +450,7 @@ process RESOLVE_GOI {
     python - <<'PY'
     import sys
     import pandas as pd
-    import pyranges as pr
+    from gtfparse import read_gtf
 
     goi_path = "${goi_tsv}"
     gtf_path = "${gtf}"
@@ -463,19 +463,20 @@ process RESOLVE_GOI {
         sys.exit("ERROR:no_gene_ids")
     gene_set = set(gene_ids)
 
-    gr = pr.read_gtf(gtf_path)
-    tx = gr[gr.Feature == "transcript"].df
+    df = read_gtf(gtf_path)
+    tx = df[df["feature"] == "transcript"]
     tx = tx[tx["gene_id"].isin(gene_set)]
     if tx.empty:
         sys.exit("ERROR:no_transcripts_for_goi")
 
     agg = (
-        tx.groupby("gene_id")
-          .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+        tx.groupby(["gene_id", "seqname", "strand"])
+          .agg(start=("start", "min"), end=("end", "max"))
           .reset_index()
+          .sort_values(["gene_id", "start"])
     )
-    agg["Region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)+1}-{int(r.End)}", axis=1)
-    region_map = dict(zip(agg["gene_id"], agg["Region"]))
+    agg["region"] = agg.apply(lambda r: f"{r.seqname}:{int(r.start)}-{int(r.end)}", axis=1)
+    region_map = dict(zip(agg["gene_id"], agg["region"]))
 
     with open("goi.resolved.tsv", "w") as out:
         out.write("gene_id\tregion\tlabel\\n")
