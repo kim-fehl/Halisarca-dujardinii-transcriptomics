@@ -273,20 +273,16 @@ process REGTOOLS_JUNCTIONS {
     output:
         path "${sample_id}.junctions.bed"
 
+    def strandFlag = (strandedness.toString().toUpperCase().contains('RF') || strandedness.toString().toLowerCase().contains('first')) ? 1
+                   : (strandedness.toString().toUpperCase().contains('FR') || strandedness.toString().toLowerCase().contains('second')) ? 2
+                   : 0
+
     script:
     """
     set -euo pipefail
-    strand_flag=0
-    shopt -s nocasematch
-    if [[ "${strandedness}" =~ RF|first ]]; then
-        strand_flag=1
-    elif [[ "${strandedness}" =~ FR|second ]]; then
-        strand_flag=2
-    fi
-    shopt -u nocasematch
     regtools junctions extract \\
       -a 8 -m 50 -M 500000 \\
-      -s ${strand_flag} \\
+      -s ${strandFlag} \\
       -o ${sample_id}.junctions.bed \\
       ${bam}
     """
