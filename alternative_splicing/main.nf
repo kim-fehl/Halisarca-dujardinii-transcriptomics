@@ -4,17 +4,16 @@ log.info "Launching alternative splicing backbone (Nextflow DSL2)"
 
 params.outdir       = params.outdir ?: 'results'
 params.samples      = params.samples ?: 'metadata/samples.tsv'
+params.samplesheet  = params.samplesheet ?: 'metadata/samplesheet.csv'
 params.gtf          = params.gtf ?: null
 params.fasta        = params.fasta ?: null
 params.strandedness = params.strandedness ?: 'fr-unstranded'
-params.bam_dir      = params.bam_dir ?: 'results/bam'
-params.stringtie_dir= params.stringtie_dir ?: 'resources/stringtie'
 params.raw_dir      = params.raw_dir ?: "${params.outdir}/raw"
 params.fastp_dir    = params.fastp_dir ?: "${params.outdir}/fastp"
 params.star_index_base = params.star_index_base ?: 'resources/star_index'
 params.threads      = params.threads ?: 8
 
-// Channel to load and validate the sample sheet
+// Channel to load and validate the sample metadata sheet
 def load_samples() {
     if (!params.samples) {
         error "Set --samples to a tab-delimited file; this project ships with metadata/samples.tsv (columns include Run, BiologicalState, Stranded, ReadLength)"
@@ -23,8 +22,13 @@ def load_samples() {
     Channel.fromPath(params.samples)
         .ifEmpty { error "Sample sheet not found: ${params.samples}" }
         .splitCsv(header: true, sep: '\t')
+        .filter { row ->
+            def flag = row.Use?.toString()?.trim()?.toUpperCase()
+            flag in ['TRUE', 'YES', '1']
+        }
         .map { row ->
             def run        = (row.Run ?: row.run ?: row.sample_id)?.toString()?.trim()
+            def experiment = (row.Experiment ?: row.experiment)?.toString()?.trim()
             def condition  = (row.BiologicalState ?: row.condition ?: 'NA')?.toString()?.trim()
             def stranded   = (row.Stranded ?: row.strandedness ?: params.strandedness).toString()
             def readlen    = row.ReadLength ? row.ReadLength.toString().replaceAll('\\r','').trim() : null
@@ -32,106 +36,82 @@ def load_samples() {
             if (!run) {
                 error "Each row must define Run/sample_id: ${row}"
             }
-
-            def bam_guess = params.bam_dir ? file("${params.bam_dir}/${run}.bam") : null
-            def bam_path  = row.bam ? file(row.bam) : bam_guess
-
-            def pre_gtf_guess = params.stringtie_dir ? file("${params.stringtie_dir}/${run}.gtf") : null
-            def pre_gtf_file  = row.gtf ? file(row.gtf) : pre_gtf_guess
-            def pre_gtf       = (pre_gtf_file && pre_gtf_file.exists()) ? pre_gtf_file : null
+            if (!experiment) {
+                error "Each row must define Experiment: ${row}"
+            }
 
             tuple(run as String,
                   condition as String,
-                  bam_path,
                   stranded,
-                  pre_gtf,
-                  readlen)
+                  readlen,
+                  experiment as String)
+        }
+}
+
+// Channel to load nf-core/fetchngs samplesheet with fastq paths
+def load_samplesheet() {
+    if (!params.samplesheet) {
+        error "Set --samplesheet to a fetchngs samplesheet CSV (sample,fastq_1,fastq_2,experiment_accession,run_accession,...)"
+    }
+
+    Channel.fromPath(params.samplesheet)
+        .ifEmpty { error "Samplesheet not found: ${params.samplesheet}" }
+        .splitCsv(header: true, sep: ',')
+        .map { row ->
+            def exp = row.experiment_accession?.toString()?.trim()
+            def r1  = row.fastq_1?.toString()?.trim()
+            def r2  = row.fastq_2?.toString()?.trim()
+            if (!exp || !r1 || !r2) {
+                error "Samplesheet rows must include experiment_accession, fastq_1, fastq_2: ${row}"
+            }
+            tuple(exp, file(r1), file(r2))
         }
 }
 
 workflow {
     samples_ch = load_samples()
+    sheet_ch   = load_samplesheet()
 
-    // Split samples into those with precomputed BAMs vs. those needing alignment
-    def branched = samples_ch.branch { sid, cond, bam, strand, gtf, readlen ->
-        prealigned: bam && bam.exists()
-        needs_alignment: !(bam && bam.exists())
-    }
+    // Join samples metadata to fastq paths using Experiment accession
+    samples_with_fastq = samples_ch
+        .map { run, cond, strand, readlen, exp -> tuple(exp, run, cond, strand, readlen) }
+        .join(sheet_ch)
+        .map { exp, run, cond, strand, readlen, r1, r2 -> tuple(run, cond, strand, readlen, r1, r2) }
 
-    prealigned_ch = branched.prealigned.map { sid, cond, bam, strand, gtf, readlen ->
-        tuple(sid, cond, strand, readlen, bam, gtf)
-    }
-
-    align_input_ch = branched.needs_alignment.map { sid, cond, bam, strand, gtf, readlen ->
+    align_input_ch = samples_with_fastq.map { sid, cond, strand, readlen, r1, r2 ->
         if (!readlen) {
-            error "ReadLength is required for ${sid} when no precomputed BAM is available"
+            error "ReadLength is required for ${sid}"
         }
-        tuple(sid, cond, bam, strand, gtf, readlen)
+        tuple(sid, cond, strand, readlen, r1, r2)
     }
 
     // Build STAR indices per read length for samples that need alignment
-    readlen_ch = align_input_ch.map { sid, cond, bam, strand, gtf, readlen -> readlen }
+    readlen_ch = align_input_ch.map { sid, cond, strand, readlen, r1, r2 -> readlen }
                                 .filter { it }
                                 .unique()
     star_indices = STAR_INDEX(readlen_ch)
 
-    // Download + fastp for samples needing alignment
-    raw_fastq    = DOWNLOAD_SRA(align_input_ch)
-    def fastp_step = FASTP(raw_fastq)
+    // fastp for samples with provided FASTQs
+    def fastp_step = FASTP(align_input_ch)
     trimmed      = fastp_step.reads
 
     // Match trimmed reads to the correct STAR index by read length
-    trimmed_keyed = trimmed.map { sid, cond, strand, readlen, gtf, r1, r2 ->
-        tuple(readlen, sid, cond, strand, gtf, r1, r2)
+    trimmed_keyed = trimmed.map { sid, cond, strand, readlen, r1, r2 ->
+        tuple(readlen, sid, cond, strand, r1, r2)
     }
-    aligned      = STAR_ALIGN(trimmed_keyed.join(star_indices)).aligned_bam
+    alignment_ch = STAR_ALIGN(trimmed_keyed.join(star_indices)).aligned_bam
 
-    alignment_ch = aligned.mix(prealigned_ch)
-
-    junctions     = REGTOOLS_JUNCTIONS(alignment_ch.map { sid, cond, strand, readlen, bam, gtf -> tuple(sid, cond, bam, strand) })
+    junctions     = REGTOOLS_JUNCTIONS(alignment_ch.map { sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
     assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
     merged_gtf    = STRINGTIE_MERGE(assemblies.out.assembled_gtf)
     comparison    = GFFCOMPARE(merged_gtf.out.merged_gtf)
-    junction_sets = LEAFCUTTER_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam, gtf -> tuple(sid, cond, bam, strand) })
-    rmats_events  = RMATS_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam, gtf -> tuple(sid, cond, bam, strand) })
+    junction_sets = LEAFCUTTER_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
+    rmats_events  = RMATS_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
 
     transcriptome = BUILD_TRANSCRIPTOME(merged_gtf.out.merged_gtf, params.fasta)
-    salmon_inputs = alignment_ch.map{ sid, cond, strand, readlen, bam, gtf -> tuple(sid, cond, bam, strand) }
+    salmon_inputs = alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) }
                                 .combine(transcriptome.out.transcript_fasta)
     quant         = SALMON_QUANT(salmon_inputs)
-}
-
-process DOWNLOAD_SRA {
-    tag { sample_id }
-    publishDir "${params.raw_dir}", mode: 'copy'
-    cpus params.threads
-
-    input:
-        tuple val(sample_id), val(condition), val(bam), val(strandedness), path(pre_gtf) optional true, val(readlen)
-
-    output:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(pre_gtf) optional true, path("${sample_id}_1.fastq.gz"), path("${sample_id}_2.fastq.gz")
-
-    script:
-    """
-    set -euo pipefail
-    r1="${params.raw_dir}/${sample_id}_1.fastq.gz"
-    r2="${params.raw_dir}/${sample_id}_2.fastq.gz"
-
-    if [[ -s "\${r1}" && -s "\${r2}" ]]; then
-        echo "[INFO] Reusing existing FASTQ for ${sample_id}"
-        cp "\${r1}" "${sample_id}_1.fastq.gz"
-        cp "\${r2}" "${sample_id}_2.fastq.gz"
-        exit 0
-    fi
-
-    echo "[INFO] Downloading ${sample_id} to ${params.raw_dir}"
-    mkdir -p "${params.raw_dir}"
-    fasterq-dump --threads ${task.cpus} --split-files --outdir "${params.raw_dir}" "${sample_id}"
-    pigz -p ${task.cpus} -f "${params.raw_dir}/${sample_id}"_1.fastq "${params.raw_dir}/${sample_id}"_2.fastq
-    cp "\${r1}" "${sample_id}_1.fastq.gz"
-    cp "\${r2}" "${sample_id}_2.fastq.gz"
-    """
 }
 
 process FASTP {
@@ -140,10 +120,10 @@ process FASTP {
     cpus params.threads
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(pre_gtf) optional true, path(r1), path(r2)
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(r1), path(r2)
 
     output:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(pre_gtf) optional true, path("${sample_id}_clean_1.fastq.gz"), path("${sample_id}_clean_2.fastq.gz"), emit: reads
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path("${sample_id}_clean_1.fastq.gz"), path("${sample_id}_clean_2.fastq.gz"), emit: reads
         path "${sample_id}.fastp.html", emit: report_html
         path "${sample_id}.fastp.json", emit: report_json
 
@@ -201,10 +181,10 @@ process STAR_ALIGN {
     cpus params.threads
 
     input:
-        tuple val(readlen), val(sample_id), val(condition), val(strandedness), path(pre_gtf) optional true, path(r1), path(r2), path(index_dir)
+        tuple val(readlen), val(sample_id), val(condition), val(strandedness), path(r1), path(r2), path(index_dir)
 
     output:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path("${sample_id}.bam"), path(pre_gtf) optional true, emit: aligned_bam
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path("${sample_id}.bam"), emit: aligned_bam
         path "${sample_id}.bam.bai", emit: bam_index
 
     script:
@@ -252,7 +232,7 @@ process STRINGTIE_ASSEMBLE {
     cpus params.threads
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam), path(pre_gtf) optional true
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.gtf", emit: assembled_gtf
@@ -262,13 +242,8 @@ process STRINGTIE_ASSEMBLE {
                   : strandedness.toUpperCase().contains('FR') ? '--fr'
                   : ''
     """
-    if [[ -s "${pre_gtf}" ]]; then
-        echo "[INFO] Re-using precomputed GTF for ${sample_id}"
-        cp "${pre_gtf}" "${sample_id}.gtf"
-    else
-        echo "[INFO] Running StringTie for ${sample_id}"
-        stringtie "${bam}" -p ${task.cpus} -o "${sample_id}.gtf" -l "${sample_id}" ${strandFlag} ${params.gtf ? "-G ${params.gtf}" : ""}
-    fi
+    echo "[INFO] Running StringTie for ${sample_id}"
+    stringtie "${bam}" -p ${task.cpus} -o "${sample_id}.gtf" -l "${sample_id}" ${strandFlag} ${params.gtf ? "-G ${params.gtf}" : ""}
     """
 }
 
