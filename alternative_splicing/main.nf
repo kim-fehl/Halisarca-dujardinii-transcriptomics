@@ -147,16 +147,16 @@ workflow {
 
     alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
 
-    junctions     = REGTOOLS_JUNCTIONS(alignment_ch.map { sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
+    junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
     assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
     merged_gtf    = STRINGTIE_MERGE(assemblies)
     comparison    = GFFCOMPARE(merged_gtf)
-    junction_sets = LEAFCUTTER_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
-    rmats_events  = RMATS_PREP(alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) })
+    junction_sets = LEAFCUTTER_PREP(alignment_ch)
+    rmats_events  = RMATS_PREP(alignment_ch)
 
     transcriptome = BUILD_TRANSCRIPTOME(merged_gtf, params.fasta)
-    salmon_inputs = alignment_ch.map{ sid, cond, strand, readlen, bam -> tuple(sid, cond, bam, strand) }
-                                .combine(transcriptome)
+    salmon_inputs = alignment_ch
+        .combine(transcriptome)
     quant         = SALMON_QUANT(salmon_inputs)
 
     if (params.goi && params.gtf) {
@@ -268,13 +268,13 @@ process REGTOOLS_JUNCTIONS {
     publishDir "${params.outdir}/junctions", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), path(bam), val(strandedness)
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.junctions.bed"
 
-    def strandFlag = (strandedness.toString().toUpperCase().contains('RF') || strandedness.toString().toLowerCase().contains('first')) ? 1
-                   : (strandedness.toString().toUpperCase().contains('FR') || strandedness.toString().toLowerCase().contains('second')) ? 2
+    def strandFlag = (strandedness.toString().toUpperCase().contains('RF') || strandedness.toString().toLowerCase().contains('FIRST')) ? 1
+                   : (strandedness.toString().toUpperCase().contains('FR') || strandedness.toString().toLowerCase().contains('SECOND')) ? 2
                    : 0
 
     script:
@@ -345,7 +345,7 @@ process LEAFCUTTER_PREP {
     publishDir "${params.outdir}/leafcutter", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), path(bam), val(strandedness)
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.leafcutter.junc"
@@ -362,7 +362,7 @@ process RMATS_PREP {
     publishDir "${params.outdir}/rmats", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), path(bam), val(strandedness)
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.bam.list"
@@ -400,7 +400,7 @@ process SALMON_QUANT {
     publishDir "${params.outdir}/salmon", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), path(bam), val(strandedness), path(transcript_fasta)
+        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam), path(transcript_fasta)
 
     output:
         path "${sample_id}.quant.sf"
