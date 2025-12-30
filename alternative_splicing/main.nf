@@ -69,25 +69,21 @@ def load_samplesheet() {
         }
 }
 
-// Channel to load gene-of-interest regions for sashimi plots
+// Channel to load gene-of-interest list for sashimi plots (gene_id + description; region is resolved)
 def parse_goi(goi_ch) {
     goi_ch
         .ifEmpty { error "GOI file not found: ${params.goi}" }
         .splitCsv(header: true, sep: '\t')
         .map { row ->
-            def gene   = (row.gene_id ?: row.gene ?: row.id ?: row.Gene)?.toString()?.trim()
-            def region = (row.region ?: row.Region)?.toString()?.trim()
-            def desc   = (row.description ?: row.desc ?: row.Description)?.toString()?.trim()
-            def label  = (row.label ?: row.Label ?: desc ?: gene)?.toString()?.trim()
+            def gene = (row.gene_id ?: row.gene ?: row.id ?: row.Gene)?.toString()?.trim()
+            def desc = (row.description ?: row.desc ?: row.Description)?.toString()?.trim()
+            def label = desc ?: gene
 
             if (!gene) {
                 error "Each GOI row must define gene_id (or gene/id): ${row}"
             }
-            if (!region) {
-                error "Each GOI row must define region as chr:start-end for ${gene} (or provide --gtf to auto-resolve)"
-            }
 
-            tuple(gene, region, label)
+            tuple(gene, label)
         }
 }
 
@@ -273,19 +269,18 @@ process REGTOOLS_JUNCTIONS {
     output:
         path "${sample_id}.junctions.bed"
 
-    def strandFlag = (strandedness.toString().toUpperCase().contains('RF') || strandedness.toString().toLowerCase().contains('FIRST')) ? 1
-                   : (strandedness.toString().toUpperCase().contains('FR') || strandedness.toString().toLowerCase().contains('SECOND')) ? 2
-                   : 0
-
     script:
-    """
-    set -euo pipefail
-    regtools junctions extract \\
-      -a 8 -m 50 -M 500000 \\
-      -s ${strandFlag} \\
-      -o ${sample_id}.junctions.bed \\
-      ${bam}
-    """
+        def strandFlag = strandedness.toUpperCase().contains('RF') ? 1
+                       : strandedness.toUpperCase().contains('FR') ? 2
+                       : 0
+        """
+        set -euo pipefail
+        regtools junctions extract \\
+          -a 8 -m 50 -M 500000 \\
+          -s ${strandFlag} \\
+          -o ${sample_id}.junctions.bed \\
+          ${bam}
+        """
 }
 
 process STRINGTIE_ASSEMBLE {
@@ -440,6 +435,7 @@ process GGSASHIMI_PLOT {
 
 process RESOLVE_GOI {
     publishDir "${params.outdir}/sashimi", mode: 'copy'
+    conda "envs/pyranges.yml"
 
     input:
         path goi_tsv
@@ -451,38 +447,47 @@ process RESOLVE_GOI {
     script:
     """
     set -euo pipefail
-    awk -F '\\t' -v OFS='\\t' '
-    NR==FNR {
-      if (\$0 ~ /^#/) next
-      gid=""
-      if (match(\$9, /gene_id \"([^\"]+)\"/, m)) gid=m[1]
-      else if (match(\$9, /gene_id ([^;]+)/, m)) gid=m[1]
-      if (gid=="") next
-      if (!(gid in min) || \$4 < min[gid]) min[gid]=\$4
-      if (!(gid in max) || \$5 > max[gid]) max[gid]=\$5
-      chr[gid]=\$1
-      next
-    }
-    NR==1 {
-      for (i=1;i<=NF;i++) h[\$i]=i
-      print "gene_id","region","label"
-      next
-    }
-    {
-      gid=(h["gene_id"] ? \$(h["gene_id"]) : (h["gene"] ? \$(h["gene"]) : (h["id"] ? \$(h["id"]) : "")))
-      if (gid=="") {
-        print "ERROR:missing_gene_id" > "/dev/stderr"
-        exit 1
-      }
-      desc=(h["description"] ? \$(h["description"]) : (h["desc"] ? \$(h["desc"]) : (h["label"] ? \$(h["label"]) : "")))
-      goi_region=(h["region"] ? \$(h["region"]) : "")
-      if (goi_region=="" && (gid in chr)) goi_region=chr[gid]":"min[gid]"-"max[gid]
-      if (goi_region=="") {
-        print "ERROR:region_not_found:" gid > "/dev/stderr"
-        exit 1
-      }
-      label=(h["label"] ? \$(h["label"]) : (desc!="" ? desc : gid))
-      print gid, goi_region, label
-    }' "${gtf}" "${goi_tsv}" > goi.resolved.tsv
+    python - <<'PY'
+    import sys
+    import pandas as pd
+    import pyranges as pr
+
+    goi_path = "${goi_tsv}"
+    gtf_path = "${gtf}"
+
+    goi = pd.read_csv(goi_path, sep="\\t")
+    if "gene_id" not in goi.columns:
+        sys.exit("ERROR:missing_gene_id_column")
+    gene_ids = goi["gene_id"].dropna().astype(str).str.strip()
+    if gene_ids.empty:
+        sys.exit("ERROR:no_gene_ids")
+    gene_set = set(gene_ids)
+
+    gr = pr.read_gtf(gtf_path)
+    tx = gr[gr.Feature == "transcript"].df
+    tx = tx[tx["gene_id"].isin(gene_set)]
+    if tx.empty:
+        sys.exit("ERROR:no_transcripts_for_goi")
+
+    agg = (
+        tx.groupby("gene_id")
+          .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+          .reset_index()
+    )
+    agg["Region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)+1}-{int(r.End)}", axis=1)
+    region_map = dict(zip(agg["gene_id"], agg["Region"]))
+
+    with open("goi.resolved.tsv", "w") as out:
+        out.write("gene_id\tregion\tlabel\\n")
+        for _, row in goi.iterrows():
+            gid = str(row["gene_id"]).strip()
+            if not gid:
+                sys.exit("ERROR:missing_gene_id")
+            label = str(row.get("description", "") or "").strip() or gid
+            region = str(row.get("region", "") or "").strip() or region_map.get(gid, "")
+            if not region:
+                sys.exit(f"ERROR:region_not_found:{gid}")
+            out.write(f"{gid}\t{region}\t{label}\\n")
+    PY
     """
 }

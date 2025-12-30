@@ -1,0 +1,8 @@
+name: pyranges
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pyranges=0.0.129
+  - pandas
