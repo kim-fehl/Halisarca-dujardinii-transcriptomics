@@ -6,6 +6,7 @@ Nextflow DSL2 scaffold for alternative splicing analyses on genome-aligned paire
 - `main.nf` – pipeline entry with stubbed processes for junction extraction (regtools), event callers (rMATS/LeafCutter), assembly/quantification (StringTie/gffcompare/Salmon), and plotting hooks.
 - `nextflow.config` – defaults for params, executors, and log/output locations; extend with per-environment profiles under `conf/`.
 - `metadata/` – sample sheet lives here (see `metadata/samples.tsv` template).
+- `metadata/goi.tsv` – gene-of-interest list for sashimi plots (regions auto-resolved from GTF when missing).
 - `resources/` – reference genome/annotation (FASTA/GTF) and any tool-specific indexes.
 - `modules/local/`, `bin/` – place custom Nextflow modules and helper scripts.
 - `results/`, `logs/` – pipeline outputs; `work/` is created by Nextflow at runtime.
@@ -48,6 +49,12 @@ nextflow run main.nf -profile local \
   --outdir results
 ```
 
+Optional: add a `metadata/goi.tsv` with `gene_id`, optional `region` (chr:start-end), and `description` (used for plot labels) to trigger ggsashimi plots. If `region` is blank and `--gtf` is provided, regions are derived from gene entries in the GTF/GFF:
+```
+gene_id	description	region
+VCP	VCP/p97	
+```
+
 Outputs land under `results/` and `logs/`. Swap `-profile` once you add HPC/cloud settings under `conf/`.
 
 ## What the pipeline does now (StringTie.sh parity)
@@ -57,7 +64,10 @@ Outputs land under `results/` and `logs/`. Swap `-profile` once you add HPC/clou
 - Aligns with STAR → sorted BAM + index
 - Assembles with StringTie
 - Downstream placeholders: regtools junctions, gffcompare merge/compare, LeafCutter/rMATS prep, transcriptome build, Salmon quant
+- Junction discovery: regtools junctions extract
+- Visualization: optional ggsashimi plots per GOI region
 
 ## Requirements
 - SRA Toolkit (`prefetch`/`fasterq-dump`), `fastp`, `STAR`, `samtools`, `stringtie`
+- `regtools` for junction extraction, `ggsashimi` for sashimi plots
 - Reference FASTA/GTF set via `--fasta` / `--gtf`
