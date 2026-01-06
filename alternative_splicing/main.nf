@@ -393,7 +393,7 @@ process SALMON_QUANT {
 process GGSASHIMI_PLOT {
     tag { gene_id }
     publishDir "${params.outdir}/sashimi", mode: 'copy'
-    conda "envs/ggsashimi.yml"
+    container "docker.io/guigolab/ggsashimi:latest"
 
     input:
         tuple val(gene_id), val(region), val(label), path(bam_manifest)
