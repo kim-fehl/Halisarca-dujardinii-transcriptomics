@@ -69,36 +69,19 @@ def load_samplesheet() {
         }
 }
 
-// Channel to load gene-of-interest list for sashimi plots (gene_id + description; region is resolved)
-def parse_goi(goi_ch) {
-    goi_ch
-        .ifEmpty { error "GOI file not found: ${params.goi}" }
-        .splitCsv(header: true, sep: '\t')
-        .map { row ->
-            def gene = (row.gene_id ?: row.gene ?: row.id ?: row.Gene)?.toString()?.trim()
-            def desc = (row.description ?: row.desc ?: row.Description)?.toString()?.trim()
-            def label = desc ?: gene
-
-            if (!gene) {
-                error "Each GOI row must define gene_id (or gene/id): ${row}"
-            }
-
-            tuple(gene, label)
-        }
-}
-
 workflow {
+    if (!params.gtf) {
+        error "Parameter --gtf is required for this pipeline."
+    }
+
     samples_ch = load_samples()
     sheet_ch   = load_samplesheet()
     goi_ch     = Channel.empty()
 
     if (params.goi) {
-        if (params.gtf) {
-            goi_file_ch = RESOLVE_GOI(file(params.goi), file(params.gtf)).goi_resolved
-        } else {
-            goi_file_ch = Channel.fromPath(params.goi)
-        }
-        goi_ch = parse_goi(goi_file_ch)
+        goi_ch = RESOLVE_GOI(file(params.goi), file(params.gtf)).goi_resolved
+            .splitCsv(header: true, sep: '\t')
+            .map { row -> tuple(row.gene_id.toString(), row.region.toString(), (row.label ?: row.description ?: row.gene_id).toString()) }
     }
 
     // Join samples metadata to fastq paths using Experiment accession
@@ -160,6 +143,7 @@ workflow {
             .collectFile(name: "bam_manifest.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
+                            .map { g, r, l, manifest -> tuple(g, r, l, manifest) }
         sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs)
     }
 }
@@ -460,19 +444,17 @@ process RESOLVE_GOI {
     if gene_ids.empty:
         sys.exit("ERROR:no_gene_ids")
 
-    tx_df = (
-        pr.read_gtf(gtf_path)
-          .df
-          .query("Feature == 'transcript'")
-          .query("gene_id in @gene_ids")["gene_id Chromosome Strand Start End".split()]
-    )
+    tx = pr.read_gtf(gtf_path)
+    tx = tx[tx.Feature == "transcript"]
+    tx = tx.query("gene_id in @gene_ids")
+    tx_df = tx[["gene_id", "Chromosome", "Strand", "Start", "End"]]
     if tx_df.empty:
         sys.exit("ERROR:no_transcripts_for_goi")
 
     agg = (
         tx_df.groupby("gene_id")
-        .agg({"Chromosome": "first", "Start": "min", "End": "max"})
-        .reset_index()
+             .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+             .reset_index()
     )
     agg["region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)}-{int(r.End)}", axis=1)
 
