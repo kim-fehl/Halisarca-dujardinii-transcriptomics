@@ -1,8 +1,10 @@
 name: pyranges
 channels:
   - conda-forge
-  - bioconda
+  - defaults
 dependencies:
-  - python=3.11
-  - pyranges=0.0.129
+  - python=3.12
   - pandas
+  - pip
+  - pip:
+    - pyranges1

@@ -435,7 +435,7 @@ process GGSASHIMI_PLOT {
 
 process RESOLVE_GOI {
     publishDir "${params.outdir}/sashimi", mode: 'copy'
-    conda "envs/gtfparse.yml"
+    conda "envs/pyranges.yml"
 
     input:
         path goi_tsv
@@ -450,7 +450,7 @@ process RESOLVE_GOI {
     python - <<'PY'
     import sys
     import pandas as pd
-    from gtfparse import read_gtf
+    import pyranges as pr
 
     goi_path = "${goi_tsv}"
     gtf_path = "${gtf}"
@@ -463,19 +463,19 @@ process RESOLVE_GOI {
         sys.exit("ERROR:no_gene_ids")
     gene_set = set(gene_ids)
 
-    df = read_gtf(gtf_path)
-    tx = df[df["feature"] == "transcript"]
-    tx = tx[tx["gene_id"].isin(gene_set)]
-    if tx.empty:
+    gr = pr.read_gtf(gtf_path)
+    tx = gr[gr.Feature == "transcript"]
+    tx = tx.query("gene_id in @gene_set")
+    if tx.df.empty:
         sys.exit("ERROR:no_transcripts_for_goi")
 
     agg = (
-        tx.groupby(["gene_id", "seqname", "strand"])
-          .agg(start=("start", "min"), end=("end", "max"))
+        tx.df
+          .groupby("gene_id")
+          .agg({"Chromosome": "first", "Start": "min", "End": "max"})
           .reset_index()
-          .sort_values(["gene_id", "start"])
     )
-    agg["region"] = agg.apply(lambda r: f"{r.seqname}:{int(r.start)}-{int(r.end)}", axis=1)
+    agg["region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)}-{int(r.End)}", axis=1)
     region_map = dict(zip(agg["gene_id"], agg["region"]))
 
     with open("goi.resolved.tsv", "w") as out:
