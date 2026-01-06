@@ -143,17 +143,16 @@ workflow {
 
     alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
 
-    //junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
-    assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
-    merged_gtf    = STRINGTIE_MERGE(assemblies)
-    comparison    = GFFCOMPARE(merged_gtf)
-    junction_sets = LEAFCUTTER_PREP(alignment_ch)
-    rmats_events  = RMATS_PREP(alignment_ch)
-
-    transcriptome = BUILD_TRANSCRIPTOME(merged_gtf, params.fasta)
-    salmon_inputs = alignment_ch
-        .combine(transcriptome)
-    quant         = SALMON_QUANT(salmon_inputs)
+    // Temporarily disable downstream event/isoform steps while focusing on sashimi plots
+    // junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
+    // assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
+    // merged_gtf    = STRINGTIE_MERGE(assemblies)
+    // comparison    = GFFCOMPARE(merged_gtf)
+    // junction_sets = LEAFCUTTER_PREP(alignment_ch)
+    // rmats_events  = RMATS_PREP(alignment_ch)
+    // transcriptome = BUILD_TRANSCRIPTOME(merged_gtf, params.fasta)
+    // salmon_inputs = alignment_ch.combine(transcriptome)
+    // quant         = SALMON_QUANT(salmon_inputs)
 
     if (params.goi && params.gtf) {
         bam_manifest = alignment_ch
@@ -161,7 +160,7 @@ workflow {
             .collectFile(name: "bam_manifest.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
-        sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs.view { "sashimi: ${it}" } )
+        sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs)
     }
 }
 
@@ -434,7 +433,7 @@ process GGSASHIMI_PLOT {
 }
 
 process RESOLVE_GOI {
-    publishDir "${params.outdir}/sashimi", mode: 'copy'
+    publishDir "${params.outdir}/sashimi", mode: "copy"
     conda "envs/pyranges.yml"
 
     input:
@@ -446,8 +445,7 @@ process RESOLVE_GOI {
 
     script:
     """
-    set -euo pipefail
-    python - <<'PY'
+    #!/usr/bin/env python
     import sys
     import pandas as pd
     import pyranges as pr
@@ -455,40 +453,37 @@ process RESOLVE_GOI {
     goi_path = "${goi_tsv}"
     gtf_path = "${gtf}"
 
-    goi = pd.read_csv(goi_path, sep="\\t")
+    goi = pd.read_csv(goi_path, sep="\t")
     if "gene_id" not in goi.columns:
         sys.exit("ERROR:missing_gene_id_column")
     gene_ids = goi["gene_id"].dropna().astype(str).str.strip()
     if gene_ids.empty:
         sys.exit("ERROR:no_gene_ids")
-    gene_set = set(gene_ids)
 
-    gr = pr.read_gtf(gtf_path)
-    tx = gr[gr.Feature == "transcript"]
-    tx = tx.query("gene_id in @gene_set")
-    if tx.df.empty:
+    tx_df = (
+        pr.read_gtf(gtf_path)
+          .df
+          .query("Feature == 'transcript'")
+          .query("gene_id in @gene_ids")["gene_id Chromosome Strand Start End".split()]
+    )
+    if tx_df.empty:
         sys.exit("ERROR:no_transcripts_for_goi")
 
     agg = (
-        tx.df
-          .groupby("gene_id")
-          .agg({"Chromosome": "first", "Start": "min", "End": "max"})
-          .reset_index()
+        tx_df.groupby("gene_id")
+        .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+        .reset_index()
     )
     agg["region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)}-{int(r.End)}", axis=1)
-    region_map = dict(zip(agg["gene_id"], agg["region"]))
 
-    with open("goi.resolved.tsv", "w") as out:
-        out.write("gene_id\tregion\tlabel\\n")
-        for _, row in goi.iterrows():
-            gid = str(row["gene_id"]).strip()
-            if not gid:
-                sys.exit("ERROR:missing_gene_id")
-            label = str(row.get("description", "") or "").strip() or gid
-            region = str(row.get("region", "") or "").strip() or region_map.get(gid, "")
-            if not region:
-                sys.exit(f"ERROR:region_not_found:{gid}")
-            out.write(f"{gid}\t{region}\t{label}\\n")
-    PY
+    merged = goi.merge(agg[["gene_id", "region"]], on="gene_id", how="left")
+    if merged["region"].isnull().any():
+        missing = merged[merged["region"].isnull()]["gene_id"].tolist()
+        sys.exit(f"ERROR:region_not_found:{','.join(missing)}")
+
+    merged["label"] = merged["description"].fillna("").str.strip()
+    merged.loc[merged["label"] == "", "label"] = merged["gene_id"]
+
+    merged[["gene_id", "region", "label"]].to_csv("goi.resolved.tsv", sep="\t", index=False)
     """
 }
