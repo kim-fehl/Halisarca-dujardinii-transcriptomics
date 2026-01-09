@@ -5,9 +5,11 @@ log.info "Launching alternative splicing backbone (Nextflow DSL2)"
 params.outdir       = params.outdir ?: 'results'
 params.samples      = params.samples ?: 'metadata/samples.tsv'
 params.samplesheet  = params.samplesheet ?: 'metadata/samplesheet.csv'
+params.bam_dir      = params.bam_dir ?: null
 params.goi          = params.goi ?: null
 params.gtf          = params.gtf ?: null
 params.fasta        = params.fasta ?: null
+params.palette      = params.palette ?: 'conf/palette.tsv'
 params.strandedness = params.strandedness ?: 'fr-unstranded'
 params.raw_dir      = params.raw_dir ?: "${params.outdir}/raw"
 params.fastp_dir    = params.fastp_dir ?: "${params.outdir}/fastp"
@@ -75,7 +77,6 @@ workflow {
     }
 
     samples_ch = load_samples()
-    sheet_ch   = load_samplesheet()
     goi_ch     = Channel.empty()
 
     if (params.goi) {
@@ -84,47 +85,55 @@ workflow {
             .map { row -> tuple(row.gene_id.toString(), row.region.toString(), (row.label ?: row.description ?: row.gene_id).toString()) }
     }
 
-    // Join samples metadata to fastq paths using Experiment accession
-    samples_with_fastq = samples_ch
-        .map { run, cond, strand, readlen, exp -> tuple(exp, run, cond, strand, readlen) }
-        .join(sheet_ch)
-        .map { exp, run, cond, strand, readlen, r1, r2 -> tuple(run, cond, strand, readlen, r1, r2) }
-
-    samples_with_fastq
-        .map { run, cond, strand, readlen, r1, r2 -> "${run}\t${cond}\t${strand}\t${readlen}\t${r1}\t${r2}" }
-        .collectFile(name: "joined_samples.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
-
-    align_input_ch = samples_with_fastq.map { sid, cond, strand, readlen, r1, r2 ->
-        if (!readlen) {
-            error "ReadLength is required for ${sid}"
-        }
-        tuple(sid, cond, strand, readlen, r1, r2)
-    }
-
-    // Build STAR indices per read length for samples that need alignment
-    readlen_ch = align_input_ch.map { sid, cond, strand, readlen, r1, r2 -> readlen }
-                                .filter { it }
-                                .unique()
-    star_indices = STAR_INDEX(readlen_ch)
-
-    // fastp for samples with provided FASTQs
-    def fastp_step = FASTP(align_input_ch)
-    trimmed      = fastp_step.reads
-
-    // Match trimmed reads to the correct STAR index by read length
-    trimmed_grouped = trimmed
-        .map { sid, cond, strand, readlen, r1, r2 -> tuple(readlen, tuple(sid, cond, strand, r1, r2)) }
-        .groupTuple()
-
-    aligned_input = trimmed_grouped.join(star_indices)
-        .flatMap { readlen, samples, index_dir ->
-            samples.collect { sample ->
-                def (sid, cond, strand, r1, r2) = sample
-                tuple(readlen, sid, cond, strand, r1, r2, index_dir)
+    if (params.bam_dir) {
+        alignment_ch = samples_ch.map { sid, cond, strand, readlen, exp ->
+            def bam_path = file("${params.bam_dir}/${sid}.bam")
+            if (!bam_path.exists()) {
+                error "BAM not found for ${sid} in --bam_dir: ${bam_path}"
             }
+            tuple(sid, cond, strand, readlen, bam_path)
+        }
+    } else {
+        sheet_ch   = load_samplesheet()
+
+        // Join samples metadata to fastq paths using Experiment accession
+        samples_with_fastq = samples_ch
+            .map { run, cond, strand, readlen, exp -> tuple(exp, run, cond, strand, readlen) }
+            .join(sheet_ch)
+            .map { exp, run, cond, strand, readlen, r1, r2 -> tuple(run, cond, strand, readlen, r1, r2) }
+
+        align_input_ch = samples_with_fastq.map { sid, cond, strand, readlen, r1, r2 ->
+            if (!readlen) {
+                error "ReadLength is required for ${sid}"
+            }
+            tuple(sid, cond, strand, readlen, r1, r2)
         }
 
-    alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
+        // Build STAR indices per read length for samples that need alignment
+        readlen_ch = align_input_ch.map { sid, cond, strand, readlen, r1, r2 -> readlen }
+                                    .filter { it }
+                                    .unique()
+        star_indices = STAR_INDEX(readlen_ch)
+
+        // fastp for samples with provided FASTQs
+        def fastp_step = FASTP(align_input_ch)
+        trimmed      = fastp_step.reads
+
+        // Match trimmed reads to the correct STAR index by read length
+        trimmed_grouped = trimmed
+            .map { sid, cond, strand, readlen, r1, r2 -> tuple(readlen, tuple(sid, cond, strand, r1, r2)) }
+            .groupTuple()
+
+        aligned_input = trimmed_grouped.join(star_indices)
+            .flatMap { readlen, samples, index_dir ->
+                samples.collect { sample ->
+                    def (sid, cond, strand, r1, r2) = sample
+                    tuple(readlen, sid, cond, strand, r1, r2, index_dir)
+                }
+            }
+
+        alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
+    }
 
     // Temporarily disable downstream event/isoform steps while focusing on sashimi plots
     // junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
@@ -139,11 +148,13 @@ workflow {
 
     if (params.goi && params.gtf) {
         bam_manifest = alignment_ch
-            .map { sid, cond, strand, readlen, bam -> "${sid}\t${cond}\t${bam}" }
+            .map { sid, cond, strand, readlen, bam -> "${sid}\t${bam}\t${cond}" }
+            .collect()
+            .map { rows -> rows.sort { it.split('\\t')[2] } }
             .collectFile(name: "bam_manifest.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
-                            .map { g, r, l, manifest -> tuple(g, r, l, manifest) }
+                            .map { g, r, l, manifest -> tuple(g, r, l, manifest, file(params.gtf), file(params.palette)) }
         sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs)
     }
 }
@@ -394,26 +405,38 @@ process GGSASHIMI_PLOT {
     tag { gene_id }
     publishDir "${params.outdir}/sashimi", mode: 'copy'
     container "docker.io/guigolab/ggsashimi:latest"
+    containerOptions '--entrypoint ""'
 
     input:
-        tuple val(gene_id), val(region), val(label), path(bam_manifest)
+        tuple val(gene_id), val(region), val(label), path(bam_manifest), path(gtf), path(palette)
 
     output:
         path "${gene_id}.sashimi.pdf"
+        path "${gene_id}.sashimi.grouped.pdf"
 
     script:
     """
     set -euo pipefail
-    bams=\$(awk -F '\\t' '{print \$3}' ${bam_manifest} | paste -sd, -)
-    labels=\$(awk -F '\\t' '{print \$1}' ${bam_manifest} | paste -sd, -)
-    ggsashimi \\
-      -b "\${bams}" \\
-      -c "${region}" \\
-      -g "${params.gtf}" \\
-      --labels "\${labels}" \\
-      --title "${label}" \\
-      --format pdf \\
+    python /ggsashimi.py \\
+      --bam "${bam_manifest}" \\
+      --coordinates "${region}" \\
+      --gtf "${gtf}" \\
+      --palette "${palette}" \\
+      --labels 3 \\
+      --color-factor 3 \\
+      --base-size 11 \\
       -o "${gene_id}.sashimi"
+
+    python /ggsashimi.py \\
+      --bam "${bam_manifest}" \\
+      --coordinates "${region}" \\
+      --gtf "${gtf}" \\
+      --palette "${palette}" \\
+      --labels 3 \\
+      --overlay 3 \\
+      --color-factor 3 \\
+      --base-size 11 \\
+      -o "${gene_id}.sashimi.grouped"
     """
 }
 
