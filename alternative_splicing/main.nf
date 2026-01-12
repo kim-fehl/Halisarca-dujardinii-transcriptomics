@@ -32,7 +32,7 @@ def load_samples() {
         .map { row ->
             def run        = (row.Run ?: row.run ?: row.sample_id)?.toString()?.trim()
             def experiment = (row.Experiment ?: row.experiment)?.toString()?.trim()
-            def condition  = (row.BiologicalState ?: row.condition ?: 'NA')?.toString()?.trim()
+            def condition  = (row.Sample ?: row.condition ?: 'NA')?.toString()?.trim()
             def stranded   = (row.Stranded ?: row.strandedness ?: params.strandedness).toString()
             def readlen    = row.ReadLength ? row.ReadLength.toString().replaceAll('\\r','').trim() : null
 
@@ -148,10 +148,9 @@ workflow {
 
     if (params.goi && params.gtf) {
         bam_manifest = alignment_ch
-            .map { sid, cond, strand, readlen, bam -> "${sid}\t${bam}\t${cond}" }
-            .collect()
-            .map { rows -> rows.sort { it.split('\\t')[2] } }
-            .collectFile(name: "bam_manifest.tsv", newLine: true, storeDir: "${params.outdir}", deleteTempFilesOnClose: true)
+            .map { sid, cond, strand, readlen, bam -> "${sid}\t${bam.toString()}\t${cond}" }
+            .collectFile(name: "bam_manifest.tsv", newLine: true, sort: { it -> it.tokenize('\t')[2] },
+                         storeDir: "${params.outdir}/sashimi")
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
                             .map { g, r, l, manifest -> tuple(g, r, l, manifest, file(params.gtf), file(params.palette)) }
@@ -401,6 +400,39 @@ process SALMON_QUANT {
     """
 }
 
+
+process BAM_MANIFEST {
+    tag { "bam_manifest" }
+    publishDir "${params.outdir}/sashimi", mode: 'copy'
+
+    input:
+        val alignments
+
+    output:
+        path "bam_manifest.tsv", emit: manifest
+
+    script:
+    """
+    set -euo pipefail
+    python - <<'PY'
+    from pathlib import Path
+    alignments = ${alignments.inspect()}
+    rows = []
+    for entry in alignments:
+        sid, cond, strand, readlen, bam = entry
+        bam_path = Path(bam)
+        if not bam_path.exists():
+            raise SystemExit(f"ERROR: BAM not found in manifest build: {bam_path}")
+        rows.append((cond, sid, bam_path.name))
+
+    rows.sort(key=lambda x: x[0])
+    with open("bam_manifest.tsv", "w") as out:
+        for cond, sid, bam_name in rows:
+            out.write(f"{sid}\\t{bam_name}\\t{cond}\\n")
+    PY
+    """
+}
+
 process GGSASHIMI_PLOT {
     tag { gene_id }
     publishDir "${params.outdir}/sashimi", mode: 'copy'
@@ -424,7 +456,8 @@ process GGSASHIMI_PLOT {
       --palette "${palette}" \\
       --labels 3 \\
       --color-factor 3 \\
-      --base-size 11 \\
+      --base-size 10 \\
+      --width 13 \\
       -o "${gene_id}.sashimi"
 
     python /ggsashimi.py \\
@@ -435,7 +468,11 @@ process GGSASHIMI_PLOT {
       --labels 3 \\
       --overlay 3 \\
       --color-factor 3 \\
-      --base-size 11 \\
+      --base-size 10 \\
+      --alpha 0.3 \\
+      --aggr median_j \\
+      --width 13 \\
+      --min-coverage 5 \\
       -o "${gene_id}.sashimi.grouped"
     """
 }
