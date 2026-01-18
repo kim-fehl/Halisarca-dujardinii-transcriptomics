@@ -96,7 +96,15 @@ workflow {
             if (!bam_path.exists()) {
                 error "BAM not found for ${sid} in --bam_dir: ${bam_path}"
             }
-            tuple(sid, cond, dataset, strand, readlen, bam_path)
+            def bai_path = file("${bam_path}.bai")
+            if (!bai_path.exists()) {
+                def alt_bai = file(bam_path.toString().replaceAll(/\\.bam$/, '.bai'))
+                bai_path = alt_bai
+            }
+            if (!bai_path.exists()) {
+                error "BAM index not found for ${sid}; expected ${bam_path}.bai (or .bai). Please index BAMs in --bam_dir."
+            }
+            tuple(sid, cond, dataset, strand, readlen, bam_path, bai_path)
         }
     } else {
         sheet_ch   = load_samplesheet()
@@ -164,7 +172,7 @@ workflow {
 
     if (params.goi && params.gtf) {
         bam_manifest = alignment_ch
-            .map { sid, cond, dataset, strand, readlen, bam -> "${sid}\t${bam.toString()}\t${cond}" }
+            .map { sid, cond, dataset, strand, readlen, bam, bai -> "${sid}\t${bam.toString()}\t${cond}" }
             .collectFile(name: "bam_manifest.tsv", newLine: true, sort: { it -> it.tokenize('\t')[2] },
                          storeDir: "${params.outdir}/sashimi")
 
@@ -244,7 +252,7 @@ process STAR_ALIGN {
         tuple val(readlen), val(sample_id), val(condition), val(dataset), val(strandedness), path(r1), path(r2), path(index_dir)
 
     output:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}.bam"), emit: aligned_bam
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}.bam"), path("${sample_id}.bam.bai"), emit: aligned_bam
         path "${sample_id}.bam.bai", emit: bam_index
 
     script:
@@ -271,22 +279,24 @@ process STAR_ALIGN {
 process REGTOOLS_JUNCTIONS {
     tag { sample_id }
     publishDir "${params.outdir}/junctions", mode: 'copy'
+    cpus 1
     conda "envs/regtools.yml"
 
     input:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(bai)
 
     output:
         tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}.junctions.bed"), emit: junctions
 
     script:
-        def strandFlag = strandedness.toUpperCase().contains('RF') ? 1
-                       : strandedness.toUpperCase().contains('FR') ? 2
-                       : 0
+        // regtools expects RF/FR/XS (not numeric). Use dataset-specified strandedness from samples.tsv.
+        def strandFlag = strandedness.toUpperCase().contains('RF') ? 'RF'
+                       : strandedness.toUpperCase().contains('FR') ? 'FR'
+                       : 'XS'  // default: rely on XS tags/unstranded
         """
         set -euo pipefail
         regtools junctions extract \\
-          -a 8 -m 50 -M 500000 \\
+          -a 8 -m 10 -M 50000 \\
           -s ${strandFlag} \\
           -o ${sample_id}.junctions.bed \\
           ${bam}
@@ -394,7 +404,7 @@ process STRINGTIE_ASSEMBLE {
     cpus params.threads
 
     input:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(bai)
 
     output:
         path "${sample_id}.gtf", emit: assembled_gtf
@@ -445,7 +455,7 @@ process LEAFCUTTER_PREP {
     publishDir "${params.outdir}/leafcutter", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(bai)
 
     output:
         path "${sample_id}.leafcutter.junc"
@@ -462,7 +472,7 @@ process RMATS_PREP {
     publishDir "${params.outdir}/rmats", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(bai)
 
     output:
         path "${sample_id}.bam.list"
@@ -500,7 +510,7 @@ process SALMON_QUANT {
     publishDir "${params.outdir}/salmon", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(transcript_fasta)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(bai), path(transcript_fasta)
 
     output:
         path "${sample_id}.quant.sf"
@@ -530,7 +540,7 @@ process BAM_MANIFEST {
     alignments = ${alignments.inspect()}
     rows = []
     for entry in alignments:
-        sid, cond, dataset, strand, readlen, bam = entry
+        sid, cond, dataset, strand, readlen, bam, bai = entry
         bam_path = Path(bam)
         if not bam_path.exists():
             raise SystemExit(f"ERROR: BAM not found in manifest build: {bam_path}")
