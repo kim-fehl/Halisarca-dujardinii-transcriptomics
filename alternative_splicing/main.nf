@@ -156,7 +156,8 @@ workflow {
             "${sid}\t${cond}\t${dataset}\t${strand}\t${readlen}\t${published}"
         }
         .collectFile(name: "junctions_manifest.tsv", newLine: true,
-                     sort: { line -> def toks = line.tokenize('\t'); [toks[2], toks[1], toks[0]] },
+                     // Sort by dataset, then condition, then sample_id for deterministic manifests
+                     sort: { line -> def toks = line.tokenize('\t'); "${toks[2]}\t${toks[1]}\t${toks[0]}" },
                      storeDir: "${params.outdir}/junctions")
     junction_summaries = REGTOOLS_SUMMARIZE(junction_manifest)
 
@@ -558,6 +559,7 @@ process GGSASHIMI_PLOT {
     publishDir "${params.outdir}/sashimi", mode: 'copy'
     container "docker.io/guigolab/ggsashimi:latest"
     containerOptions '--entrypoint ""'
+    cpus 1
 
     input:
         tuple val(gene_id), val(region), val(label), path(bam_manifest), path(gtf), path(palette)
