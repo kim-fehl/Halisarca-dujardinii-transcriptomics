@@ -15,6 +15,7 @@ Nextflow DSL2 scaffold for alternative splicing analyses on genome-aligned paire
 `metadata/samples.tsv` is the real dataset you supplied (columns: `Run`, `Experiment`, `BiologicalState`, `Stranded`, `ReadLength`, `Use`, ...). The pipeline auto-derives:
 - `sample_id` ← `Run`
 - `condition` ← `BiologicalState`
+- `dataset` ← `SourceAbbr` (fallback: `Source`), kept in outputs to separate ANU/IDB/MSU/SPBU material
 - `strandedness` ← `Stranded` (expects `RF` or `FR`; falls back to `params.strandedness`)
 - `readlen` ← `ReadLength` (used to pick/build STAR indices)
 - only rows with `Use=TRUE` / `YES` / `1` are processed
@@ -62,13 +63,21 @@ Outputs land under `results/` and `logs/`. Swap `-profile` once you add HPC/clou
 - QC/trim with `fastp`
 - Builds STAR indices per read length automatically under `resources/star_index/`
 - Aligns with STAR → sorted BAM + index
+- Junction discovery: regtools junctions extract per sample → merged union + sample and dataset-level count tables under `results/junctions/`
 - Assembles with StringTie
-- Downstream placeholders: regtools junctions, gffcompare merge/compare, LeafCutter/rMATS prep, transcriptome build, Salmon quant
-- Junction discovery: regtools junctions extract
+- Downstream placeholders: gffcompare merge/compare, LeafCutter/rMATS prep, transcriptome build, Salmon quant
 - Visualization: optional ggsashimi plots per GOI region
+
+Regtools outputs (in `results/junctions/`):
+- `*.junctions.bed` per sample (regtools extract)
+- `junctions_manifest.tsv` with sample/condition/dataset mapping
+- `junction_counts_sample.tsv` (long table with counts per junction/sample/condition/dataset)
+- `junction_counts_matrix.tsv` (junction × sample wide matrix)
+- `junction_counts_dataset.tsv` (junction × dataset long table, summed across samples)
+- `junctions_union.bed` (unique junctions with summed counts)
 
 ## Requirements
 - SRA Toolkit (`prefetch`/`fasterq-dump`), `fastp`, `STAR`, `samtools`, `stringtie`
-- `regtools` for junction extraction, `ggsashimi` for sashimi plots
+- `regtools` for junction extraction (see `envs/regtools.yml` for a ready conda env), `ggsashimi` for sashimi plots
 - `pyranges` (via conda) for resolving GOI regions from GTF/GFF
 - Reference FASTA/GTF set via `--fasta` / `--gtf`

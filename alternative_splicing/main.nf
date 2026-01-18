@@ -33,6 +33,7 @@ def load_samples() {
             def run        = (row.Run ?: row.run ?: row.sample_id)?.toString()?.trim()
             def experiment = (row.Experiment ?: row.experiment)?.toString()?.trim()
             def condition  = (row.Sample ?: row.condition ?: 'NA')?.toString()?.trim()
+            def dataset    = (row.SourceAbbr ?: row.Source ?: 'NA')?.toString()?.trim()
             def stranded   = (row.Stranded ?: row.strandedness ?: params.strandedness).toString()
             def readlen    = row.ReadLength ? row.ReadLength.toString().replaceAll('\\r','').trim() : null
 
@@ -42,9 +43,13 @@ def load_samples() {
             if (!experiment) {
                 error "Each row must define Experiment: ${row}"
             }
+            if (!dataset) {
+                dataset = 'NA'
+            }
 
             tuple(run as String,
                   condition as String,
+                  dataset as String,
                   stranded,
                   readlen,
                   experiment as String)
@@ -86,31 +91,31 @@ workflow {
     }
 
     if (params.bam_dir) {
-        alignment_ch = samples_ch.map { sid, cond, strand, readlen, exp ->
+        alignment_ch = samples_ch.map { sid, cond, dataset, strand, readlen, exp ->
             def bam_path = file("${params.bam_dir}/${sid}.bam")
             if (!bam_path.exists()) {
                 error "BAM not found for ${sid} in --bam_dir: ${bam_path}"
             }
-            tuple(sid, cond, strand, readlen, bam_path)
+            tuple(sid, cond, dataset, strand, readlen, bam_path)
         }
     } else {
         sheet_ch   = load_samplesheet()
 
         // Join samples metadata to fastq paths using Experiment accession
         samples_with_fastq = samples_ch
-            .map { run, cond, strand, readlen, exp -> tuple(exp, run, cond, strand, readlen) }
+            .map { run, cond, dataset, strand, readlen, exp -> tuple(exp, run, cond, dataset, strand, readlen) }
             .join(sheet_ch)
-            .map { exp, run, cond, strand, readlen, r1, r2 -> tuple(run, cond, strand, readlen, r1, r2) }
+            .map { exp, run, cond, dataset, strand, readlen, r1, r2 -> tuple(run, cond, dataset, strand, readlen, r1, r2) }
 
-        align_input_ch = samples_with_fastq.map { sid, cond, strand, readlen, r1, r2 ->
+        align_input_ch = samples_with_fastq.map { sid, cond, dataset, strand, readlen, r1, r2 ->
             if (!readlen) {
                 error "ReadLength is required for ${sid}"
             }
-            tuple(sid, cond, strand, readlen, r1, r2)
+            tuple(sid, cond, dataset, strand, readlen, r1, r2)
         }
 
         // Build STAR indices per read length for samples that need alignment
-        readlen_ch = align_input_ch.map { sid, cond, strand, readlen, r1, r2 -> readlen }
+        readlen_ch = align_input_ch.map { sid, cond, dataset, strand, readlen, r1, r2 -> readlen }
                                     .filter { it }
                                     .unique()
         star_indices = STAR_INDEX(readlen_ch)
@@ -121,22 +126,33 @@ workflow {
 
         // Match trimmed reads to the correct STAR index by read length
         trimmed_grouped = trimmed
-            .map { sid, cond, strand, readlen, r1, r2 -> tuple(readlen, tuple(sid, cond, strand, r1, r2)) }
+            .map { sid, cond, dataset, strand, readlen, r1, r2 -> tuple(readlen, tuple(sid, cond, dataset, strand, r1, r2)) }
             .groupTuple()
 
         aligned_input = trimmed_grouped.join(star_indices)
             .flatMap { readlen, samples, index_dir ->
                 samples.collect { sample ->
-                    def (sid, cond, strand, r1, r2) = sample
-                    tuple(readlen, sid, cond, strand, r1, r2, index_dir)
+                    def (sid, cond, dataset, strand, r1, r2) = sample
+                    tuple(readlen, sid, cond, dataset, strand, r1, r2, index_dir)
                 }
             }
 
         alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
     }
 
-    // Temporarily disable downstream event/isoform steps while focusing on sashimi plots
-    // junctions     = REGTOOLS_JUNCTIONS(alignment_ch)
+    // Junction discovery and summaries (regtools)
+    junctions = REGTOOLS_JUNCTIONS(alignment_ch).junctions
+    junction_manifest = junctions
+        .map { sid, cond, dataset, strand, readlen, bed ->
+            def published = file("${params.outdir}/junctions/${sid}.junctions.bed").toAbsolutePath()
+            "${sid}\t${cond}\t${dataset}\t${strand}\t${readlen}\t${published}"
+        }
+        .collectFile(name: "junctions_manifest.tsv", newLine: true,
+                     sort: { line -> def toks = line.tokenize('\t'); [toks[2], toks[1], toks[0]] },
+                     storeDir: "${params.outdir}/junctions")
+    junction_summaries = REGTOOLS_SUMMARIZE(junction_manifest)
+
+    // Temporarily disable downstream event/isoform steps while focusing on junction stats and sashimi plots
     // assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
     // merged_gtf    = STRINGTIE_MERGE(assemblies)
     // comparison    = GFFCOMPARE(merged_gtf)
@@ -148,7 +164,7 @@ workflow {
 
     if (params.goi && params.gtf) {
         bam_manifest = alignment_ch
-            .map { sid, cond, strand, readlen, bam -> "${sid}\t${bam.toString()}\t${cond}" }
+            .map { sid, cond, dataset, strand, readlen, bam -> "${sid}\t${bam.toString()}\t${cond}" }
             .collectFile(name: "bam_manifest.tsv", newLine: true, sort: { it -> it.tokenize('\t')[2] },
                          storeDir: "${params.outdir}/sashimi")
 
@@ -164,10 +180,10 @@ process FASTP {
     cpus params.threads
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(r1), path(r2)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(r1), path(r2)
 
     output:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path("${sample_id}_clean_1.fastq.gz"), path("${sample_id}_clean_2.fastq.gz"), emit: reads
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}_clean_1.fastq.gz"), path("${sample_id}_clean_2.fastq.gz"), emit: reads
         path "${sample_id}.fastp.html", emit: report_html
         path "${sample_id}.fastp.json", emit: report_json
 
@@ -225,10 +241,10 @@ process STAR_ALIGN {
     cpus params.threads
 
     input:
-        tuple val(readlen), val(sample_id), val(condition), val(strandedness), path(r1), path(r2), path(index_dir)
+        tuple val(readlen), val(sample_id), val(condition), val(dataset), val(strandedness), path(r1), path(r2), path(index_dir)
 
     output:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path("${sample_id}.bam"), emit: aligned_bam
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}.bam"), emit: aligned_bam
         path "${sample_id}.bam.bai", emit: bam_index
 
     script:
@@ -255,12 +271,13 @@ process STAR_ALIGN {
 process REGTOOLS_JUNCTIONS {
     tag { sample_id }
     publishDir "${params.outdir}/junctions", mode: 'copy'
+    conda "envs/regtools.yml"
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
 
     output:
-        path "${sample_id}.junctions.bed"
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path("${sample_id}.junctions.bed"), emit: junctions
 
     script:
         def strandFlag = strandedness.toUpperCase().contains('RF') ? 1
@@ -276,13 +293,108 @@ process REGTOOLS_JUNCTIONS {
         """
 }
 
+process REGTOOLS_SUMMARIZE {
+    tag { "regtools_summary" }
+    publishDir "${params.outdir}/junctions", mode: 'copy'
+    cpus 2
+    conda "envs/regtools.yml"
+
+    input:
+        path manifest
+
+    output:
+        path "junction_counts_sample.tsv",  emit: counts_long
+        path "junction_counts_matrix.tsv",  emit: counts_matrix
+        path "junction_counts_dataset.tsv", emit: counts_dataset
+        path "junctions_union.bed",         emit: junctions_union
+
+    script:
+    """
+    #!/usr/bin/env python
+    import sys
+    from pathlib import Path
+
+    import pandas as pd
+
+    manifest_path = Path("${manifest}").resolve()
+    if not manifest_path.exists():
+        sys.exit(f"Manifest not found: {manifest_path}")
+
+    names = ["sample_id", "condition", "dataset", "strandedness", "readlen", "bed_path"]
+    manifest_df = pd.read_csv(manifest_path, sep="\\t", header=None, names=names, comment="#")
+    manifest_df = manifest_df.dropna(how="all")
+    if manifest_df.empty:
+        sys.exit(f"No entries found in manifest: {manifest_path}")
+
+    # Expand junction beds
+    long_frames = []
+    for _, row in manifest_df.iterrows():
+        bed_file = Path(str(row.bed_path)).resolve()
+        if not bed_file.exists():
+            sys.exit(f"Missing junction bed: {bed_file}")
+        bed_df = pd.read_csv(
+            bed_file,
+            sep="\\t",
+            header=None,
+            usecols=[0, 1, 2, 4, 5],
+            names=["chrom", "start", "end", "score", "strand"],
+            comment="#",
+        )
+        if bed_df.empty:
+            continue
+        bed_df = bed_df.assign(
+            start=bed_df["start"].astype(int),
+            end=bed_df["end"].astype(int),
+            count=pd.to_numeric(bed_df["score"], errors="coerce").fillna(0).round().astype(int),
+        )
+        bed_df["strand"] = bed_df["strand"].where(bed_df["strand"].isin(["+", "-", "."]), ".")
+        bed_df["junction_id"] = bed_df["chrom"] + ":" + bed_df["start"].astype(str) + "-" + bed_df["end"].astype(str) + ":" + bed_df["strand"]
+        bed_df["sample_id"] = row.sample_id
+        bed_df["condition"] = row.condition
+        bed_df["dataset"] = row.dataset
+        bed_df["readlen"] = row.readlen
+        long_frames.append(bed_df[["junction_id", "chrom", "start", "end", "strand", "sample_id", "condition", "dataset", "readlen", "count"]])
+
+    if not long_frames:
+        sys.exit("No junctions found across beds.")
+
+    long_df = pd.concat(long_frames, ignore_index=True)
+    long_df = long_df.sort_values(["dataset", "condition", "sample_id", "junction_id"])
+    long_df.to_csv("junction_counts_sample.tsv", sep="\\t", index=False)
+
+    # Wide matrix (junction x sample)
+    matrix_df = long_df.pivot_table(index="junction_id", columns="sample_id", values="count", aggfunc="sum", fill_value=0)
+    matrix_df.reset_index(inplace=True)
+    matrix_df.to_csv("junction_counts_matrix.tsv", sep="\\t", index=False)
+
+    # Dataset-level sums
+    dataset_df = (
+        long_df.groupby(["junction_id", "dataset"], as_index=False)["count"]
+        .sum()
+        .sort_values(["dataset", "junction_id"])
+    )
+    dataset_df.to_csv("junction_counts_dataset.tsv", sep="\\t", index=False)
+
+    # Union BED with total counts across samples
+    union_df = (
+        long_df.groupby(["junction_id", "chrom", "start", "end", "strand"], as_index=False)["count"]
+        .sum()
+        .rename(columns={"count": "total_count"})
+        .sort_values(["chrom", "start", "end", "strand", "junction_id"])
+    )
+    union_df[["chrom", "start", "end", "junction_id", "total_count", "strand"]].to_csv(
+        "junctions_union.bed", sep="\\t", index=False, header=False
+    )
+    """
+}
+
 process STRINGTIE_ASSEMBLE {
     tag { sample_id }
     publishDir "${params.outdir}/assemblies", mode: 'copy'
     cpus params.threads
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.gtf", emit: assembled_gtf
@@ -333,7 +445,7 @@ process LEAFCUTTER_PREP {
     publishDir "${params.outdir}/leafcutter", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.leafcutter.junc"
@@ -350,7 +462,7 @@ process RMATS_PREP {
     publishDir "${params.outdir}/rmats", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam)
 
     output:
         path "${sample_id}.bam.list"
@@ -388,7 +500,7 @@ process SALMON_QUANT {
     publishDir "${params.outdir}/salmon", mode: 'copy'
 
     input:
-        tuple val(sample_id), val(condition), val(strandedness), val(readlen), path(bam), path(transcript_fasta)
+        tuple val(sample_id), val(condition), val(dataset), val(strandedness), val(readlen), path(bam), path(transcript_fasta)
 
     output:
         path "${sample_id}.quant.sf"
@@ -413,23 +525,21 @@ process BAM_MANIFEST {
 
     script:
     """
-    set -euo pipefail
-    python - <<'PY'
+    #!/usr/bin/env python
     from pathlib import Path
     alignments = ${alignments.inspect()}
     rows = []
     for entry in alignments:
-        sid, cond, strand, readlen, bam = entry
+        sid, cond, dataset, strand, readlen, bam = entry
         bam_path = Path(bam)
         if not bam_path.exists():
             raise SystemExit(f"ERROR: BAM not found in manifest build: {bam_path}")
-        rows.append((cond, sid, bam_path.name))
+        rows.append((dataset, cond, sid, bam_path.name))
 
-    rows.sort(key=lambda x: x[0])
+    rows.sort(key=lambda x: (x[0], x[1], x[2]))
     with open("bam_manifest.tsv", "w") as out:
-        for cond, sid, bam_name in rows:
-            out.write(f"{sid}\\t{bam_name}\\t{cond}\\n")
-    PY
+        for dataset, cond, sid, bam_name in rows:
+            out.write(f"{sid}\\t{bam_name}\\t{cond}\\t{dataset}\\n")
     """
 }
 
