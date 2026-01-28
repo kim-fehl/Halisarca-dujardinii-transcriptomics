@@ -75,6 +75,11 @@ Regtools outputs (in `results/junctions/`):
 - `junction_counts_matrix.tsv` (junction × sample wide matrix)
 - `junction_counts_dataset.tsv` (junction × dataset long table, summed across samples)
 - `junctions_union.bed` (unique junctions with summed counts)
+- If `--goi` is provided, GOI-filtered junction summaries are also written: `junction_counts_sample_goi.tsv`, `junction_counts_matrix_goi.tsv`, `junction_counts_dataset_goi.tsv`, and `junctions_union_goi.bed` (filtered to GOI `region_extended` windows).
+
+GOI resolution and manifests:
+- `goi.resolved.tsv` (under `results/sashimi/`) now includes `gene_id`, `region` (gene span), `region_extended` (gene span padded to midpoint to nearest neighbor, at least ±goi_pad; default ±1000 bp), and `label`.
+- `bam_manifest.tsv` (under `results/sashimi/`) lists sample → BAM + condition/dataset for sashimi plotting.
 
 ## Requirements
 - SRA Toolkit (`prefetch`/`fasterq-dump`), `fastp`, `STAR`, `samtools`, `stringtie`

@@ -10,11 +10,13 @@ params.goi          = params.goi ?: null
 params.gtf          = params.gtf ?: null
 params.fasta        = params.fasta ?: null
 params.palette      = params.palette ?: 'conf/palette.tsv'
-params.strandedness = params.strandedness ?: 'fr-unstranded'
-params.raw_dir      = params.raw_dir ?: "${params.outdir}/raw"
-params.fastp_dir    = params.fastp_dir ?: "${params.outdir}/fastp"
-params.star_index_base = params.star_index_base ?: 'resources/star_index'
-params.threads      = params.threads ?: 8
+params.sashimi_min_cov = params.sashimi_min_cov ?: 5
+    params.strandedness = params.strandedness ?: 'fr-unstranded'
+    params.raw_dir      = params.raw_dir ?: "${params.outdir}/raw"
+    params.fastp_dir    = params.fastp_dir ?: "${params.outdir}/fastp"
+    params.star_index_base = params.star_index_base ?: 'resources/star_index'
+    params.threads      = params.threads ?: 8
+    params.goi_pad      = params.goi_pad ?: 1000
 
 // Channel to load and validate the sample metadata sheet
 def load_samples() {
@@ -62,9 +64,24 @@ def load_samplesheet() {
         error "Set --samplesheet to a fetchngs samplesheet CSV (sample,fastq_1,fastq_2,experiment_accession,run_accession,...)"
     }
 
+    def sheet_path = file(params.samplesheet).toAbsolutePath()
+    def sheet_dir  = sheet_path.getParent()
+
+    def resolve_fastq = { String p ->
+        if (!p) return null
+
+        def rel = p.startsWith('./') ? p.substring(2) : p
+
+        def base_dir = sheet_dir.fileName.toString().equalsIgnoreCase('samplesheet')
+                        ? sheet_dir.parent
+                        : sheet_dir
+
+        base_dir.resolve(rel).normalize()
+    }
+
     Channel.fromPath(params.samplesheet)
         .ifEmpty { error "Samplesheet not found: ${params.samplesheet}" }
-        .splitCsv(header: true, sep: ',')
+        .splitCsv(header: true, sep: ',', quote: '"')
         .map { row ->
             def exp = row.experiment_accession?.toString()?.trim()
             def r1  = row.fastq_1?.toString()?.trim()
@@ -72,7 +89,9 @@ def load_samplesheet() {
             if (!exp || !r1 || !r2) {
                 error "Samplesheet rows must include experiment_accession, fastq_1, fastq_2: ${row}"
             }
-            tuple(exp, file(r1), file(r2))
+            def r1_path = resolve_fastq(r1)
+            def r2_path = resolve_fastq(r2)
+            tuple(exp, file(r1_path), file(r2_path))
         }
 }
 
@@ -83,9 +102,12 @@ workflow {
 
     samples_ch = load_samples()
     goi_ch     = Channel.empty()
+    goi_resolved_file = null
 
     if (params.goi) {
-        goi_ch = RESOLVE_GOI(file(params.goi), file(params.gtf)).goi_resolved
+        def goi_step = RESOLVE_GOI(file(params.goi), file(params.gtf))
+        goi_resolved_file = goi_step.goi_resolved
+        goi_ch = goi_resolved_file
             .splitCsv(header: true, sep: '\t')
             .map { row -> tuple(row.gene_id.toString(), row.region.toString(), (row.label ?: row.description ?: row.gene_id).toString()) }
     }
@@ -148,18 +170,28 @@ workflow {
         alignment_ch = STAR_ALIGN(aligned_input).aligned_bam
     }
 
-    // Junction discovery and summaries (regtools)
-    junctions = REGTOOLS_JUNCTIONS(alignment_ch).junctions
-    junction_manifest = junctions
-        .map { sid, cond, dataset, strand, readlen, bed ->
-            def published = file("${params.outdir}/junctions/${sid}.junctions.bed").toAbsolutePath()
-            "${sid}\t${cond}\t${dataset}\t${strand}\t${readlen}\t${published}"
-        }
-        .collectFile(name: "junctions_manifest.tsv", newLine: true,
-                     // Sort by dataset, then condition, then sample_id for deterministic manifests
-                     sort: { line -> def toks = line.tokenize('\t'); "${toks[2]}\t${toks[1]}\t${toks[0]}" },
-                     storeDir: "${params.outdir}/junctions")
-    junction_summaries = REGTOOLS_SUMMARIZE(junction_manifest)
+    // // Junction discovery and summaries (regtools)
+    // junctions = REGTOOLS_JUNCTIONS(alignment_ch).junctions
+    // junction_manifest = junctions
+    //     .map { sid, cond, dataset, strand, readlen, bed ->
+    //         def published = file("${params.outdir}/junctions/${sid}.junctions.bed").toAbsolutePath()
+    //         "${sid}\t${cond}\t${dataset}\t${strand}\t${readlen}\t${published}"
+    //     }
+    //     .collectFile(name: "junctions_manifest.tsv", newLine: true,
+    //                  // Sort by dataset, then condition, then sample_id for deterministic manifests
+    //                  sort: { line -> def toks = line.tokenize('\t'); "${toks[2]}\t${toks[1]}\t${toks[0]}" },
+    //                  storeDir: "${params.outdir}/junctions")
+    // regtools_out      = REGTOOLS_SUMMARIZE(junction_manifest)
+    // counts_long       = regtools_out.counts_long
+    // counts_matrix     = regtools_out.counts_matrix
+    // counts_dataset    = regtools_out.counts_dataset
+    // junctions_union   = regtools_out.junctions_union
+    // if (goi_resolved_file) {
+    //     goi_filter_in = goi_resolved_file
+    //         .combine(counts_long)
+    //         .combine(junctions_union)
+    //     goi_filtered = REGTOOLS_GOI_FILTER(goi_filter_in)
+    // }
 
     // Temporarily disable downstream event/isoform steps while focusing on junction stats and sashimi plots
     // assemblies    = STRINGTIE_ASSEMBLE(alignment_ch)
@@ -178,7 +210,7 @@ workflow {
                          storeDir: "${params.outdir}/sashimi")
 
         sashimi_inputs = goi_ch.combine(bam_manifest)
-                            .map { g, r, l, manifest -> tuple(g, r, l, manifest, file(params.gtf), file(params.palette)) }
+                            .map { g, r, l, manifest -> tuple(g, r, l, manifest, file(params.gtf), file(params.palette), params.sashimi_min_cov) }
         sashimi_plots  = GGSASHIMI_PLOT(sashimi_inputs)
     }
 }
@@ -399,6 +431,102 @@ process REGTOOLS_SUMMARIZE {
     """
 }
 
+process REGTOOLS_GOI_FILTER {
+    tag { "regtools_goi_filter" }
+    publishDir "${params.outdir}/junctions", mode: 'copy'
+    conda "envs/regtools.yml"
+
+    input:
+        tuple path(goi_resolved), path(counts_long), path(junctions_union)
+
+    output:
+        path "junction_counts_sample_goi.tsv",  emit: counts_long_goi
+        path "junction_counts_matrix_goi.tsv",  emit: counts_matrix_goi
+        path "junction_counts_dataset_goi.tsv", emit: counts_dataset_goi
+        path "junctions_union_goi.bed",         emit: junctions_union_goi
+
+    script:
+    """
+    #!/usr/bin/env python
+    import sys
+    from pathlib import Path
+
+    import pandas as pd
+
+    goi_path = Path("${goi_resolved}")
+    counts_path = Path("${counts_long}")
+    union_path = Path("${junctions_union}")
+
+    for p in (goi_path, counts_path, union_path):
+        if not p.exists():
+            sys.exit(f"Missing input: {p}")
+
+    goi_df = pd.read_csv(goi_path, sep="\\t")
+    for col in ["gene_id", "region_extended"]:
+        if col not in goi_df.columns:
+            sys.exit(f"GOI file missing column: {col}")
+
+    long_df = pd.read_csv(counts_path, sep="\\t")
+    if long_df.empty:
+        sys.exit("No junctions in counts_long; cannot filter.")
+
+    def parse_region(region_str):
+        chrom, coords = region_str.split(":")
+        start_s, end_s = coords.split("-")
+        return chrom, int(start_s), int(end_s)
+
+    filtered_frames = []
+    for _, row in goi_df.iterrows():
+        chrom, start, end = parse_region(str(row["region_extended"]))
+        subset = long_df[
+            (long_df["chrom"] == chrom) &
+            (long_df["start"] >= start) &
+            (long_df["end"] <= end)
+        ].copy()
+        if subset.empty:
+            continue
+        subset["goi_id"] = row["gene_id"]
+        subset["goi_region"] = row.get("region", row["region_extended"])
+        subset["goi_region_extended"] = row["region_extended"]
+        subset["goi_label"] = row.get("label", row["gene_id"])
+        filtered_frames.append(subset)
+
+    if filtered_frames:
+        filtered_long = pd.concat(filtered_frames, ignore_index=True)
+    else:
+        # Write empty with headers
+        filtered_long = long_df.head(0).copy()
+        filtered_long["goi_id"] = ""
+        filtered_long["goi_region"] = ""
+        filtered_long["goi_region_extended"] = ""
+        filtered_long["goi_label"] = ""
+
+    filtered_long = filtered_long.sort_values(["goi_id", "dataset", "condition", "sample_id", "junction_id"])
+    filtered_long.to_csv("junction_counts_sample_goi.tsv", sep="\\t", index=False)
+
+    matrix_df = filtered_long.pivot_table(index=["goi_id", "junction_id"], columns="sample_id", values="count", aggfunc="sum", fill_value=0)
+    matrix_df.reset_index(inplace=True)
+    matrix_df.to_csv("junction_counts_matrix_goi.tsv", sep="\\t", index=False)
+
+    dataset_df = (
+        filtered_long.groupby(["goi_id", "junction_id", "dataset"], as_index=False)["count"]
+        .sum()
+        .sort_values(["goi_id", "dataset", "junction_id"])
+    )
+    dataset_df.to_csv("junction_counts_dataset_goi.tsv", sep="\\t", index=False)
+
+    union_df = (
+        filtered_long.groupby(["goi_id", "junction_id", "chrom", "start", "end", "strand"], as_index=False)["count"]
+        .sum()
+        .rename(columns={"count": "total_count"})
+        .sort_values(["goi_id", "chrom", "start", "end", "strand", "junction_id"])
+    )
+    union_df[["chrom", "start", "end", "junction_id", "total_count", "strand", "goi_id"]].to_csv(
+        "junctions_union_goi.bed", sep="\\t", index=False, header=False
+    )
+    """
+}
+
 process STRINGTIE_ASSEMBLE {
     tag { sample_id }
     publishDir "${params.outdir}/assemblies", mode: 'copy'
@@ -562,11 +690,11 @@ process GGSASHIMI_PLOT {
     cpus 1
 
     input:
-        tuple val(gene_id), val(region), val(label), path(bam_manifest), path(gtf), path(palette)
+        tuple val(gene_id), val(region), val(label), path(bam_manifest), path(gtf), path(palette), val(min_cov)
 
     output:
         path "${gene_id}.sashimi.pdf"
-        path "${gene_id}.sashimi.grouped.pdf"
+        path "${gene_id}.sashimi.grouped.mincov_${min_cov}.pdf"
 
     script:
     """
@@ -594,8 +722,8 @@ process GGSASHIMI_PLOT {
       --alpha 0.3 \\
       --aggr median_j \\
       --width 13 \\
-      --min-coverage 5 \\
-      -o "${gene_id}.sashimi.grouped"
+      --min-coverage ${min_cov} \\
+      -o "${gene_id}.sashimi.grouped.mincov_${min_cov}"
     """
 }
 
@@ -620,28 +748,87 @@ process RESOLVE_GOI {
     goi_path = "${goi_tsv}"
     gtf_path = "${gtf}"
 
-    goi = pd.read_csv(goi_path, sep="\t")
+    goi = pd.read_csv(goi_path, sep="\\t")
     if "gene_id" not in goi.columns:
         sys.exit("ERROR:missing_gene_id_column")
     gene_ids = goi["gene_id"].dropna().astype(str).str.strip()
     if gene_ids.empty:
         sys.exit("ERROR:no_gene_ids")
 
-    tx = pr.read_gtf(gtf_path)
-    tx = tx[tx.Feature == "transcript"]
-    tx = tx.query("gene_id in @gene_ids")
-    tx_df = tx[["gene_id", "Chromosome", "Strand", "Start", "End"]]
-    if tx_df.empty:
+    tx_all = pr.read_gtf(gtf_path)
+    tx_all = tx_all[tx_all.Feature == "transcript"]
+    if tx_all.empty:
+        sys.exit("ERROR:no_transcripts_in_gtf")
+
+    # Spans for all genes (for neighbor-aware padding)
+    all_gene_spans = (
+        tx_all.groupby("gene_id")
+        .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+        .reset_index()
+    )
+
+    # GOI spans for primary regions
+    tx_goi = tx_all[tx_all["gene_id"].isin(gene_ids)]
+    if tx_goi.empty:
         sys.exit("ERROR:no_transcripts_for_goi")
 
-    agg = (
-        tx_df.groupby("gene_id")
-             .agg({"Chromosome": "first", "Start": "min", "End": "max"})
-             .reset_index()
+    goi_spans = (
+        tx_goi.groupby("gene_id")
+        .agg({"Chromosome": "first", "Start": "min", "End": "max"})
+        .reset_index()
     )
-    agg["region"] = agg.apply(lambda r: f"{r.Chromosome}:{int(r.Start)}-{int(r.End)}", axis=1)
 
-    merged = goi.merge(agg[["gene_id", "region"]], on="gene_id", how="left")
+    def compute_padding(df, pad_min):
+        df = df.sort_values(["Chromosome", "Start", "End"]).reset_index(drop=True)
+        records = df.to_dict("records")
+        prev_end_by_idx = []
+        prev_end = {}
+        for rec in records:
+            chrom = rec["Chromosome"]
+            prev_val = prev_end.get(chrom)
+            prev_end_by_idx.append(prev_val)
+            prev_end[chrom] = rec["End"]
+        next_start_by_idx = [None] * len(records)
+        next_start = {}
+        for i in range(len(records) - 1, -1, -1):
+            rec = records[i]
+            chrom = rec["Chromosome"]
+            next_val = next_start.get(chrom)
+            next_start_by_idx[i] = next_val
+            next_start[chrom] = rec["Start"]
+        padded = []
+        for rec, prev_e, next_s in zip(records, prev_end_by_idx, next_start_by_idx):
+            start = int(rec["Start"])
+            end = int(rec["End"])
+            pad_left = pad_min
+            if prev_e is not None and start > prev_e:
+                gap_left = start - int(prev_e)
+                pad_left = min(pad_min, gap_left // 2)
+            pad_right = pad_min
+            if next_s is not None and int(next_s) > end:
+                gap_right = int(next_s) - end
+                pad_right = min(pad_min, gap_right // 2)
+            ext_start = max(0, start - pad_left)
+            ext_end = end + pad_right
+            padded.append((ext_start, ext_end))
+        df["ExtendedStart"] = [p[0] for p in padded]
+        df["ExtendedEnd"] = [p[1] for p in padded]
+        return df
+
+    padded_all = compute_padding(all_gene_spans, pad_min=${params.goi_pad})
+    padded_goi = goi_spans.merge(
+        padded_all[["gene_id", "ExtendedStart", "ExtendedEnd"]],
+        on="gene_id",
+        how="left",
+        validate="one_to_one",
+    )
+
+    padded_goi["region"] = padded_goi.apply(lambda r: f"{r.Chromosome}:{int(r.Start)}-{int(r.End)}", axis=1)
+    padded_goi["region_extended"] = padded_goi.apply(
+        lambda r: f"{r.Chromosome}:{int(r.ExtendedStart)}-{int(r.ExtendedEnd)}", axis=1
+    )
+
+    merged = goi.merge(padded_goi[["gene_id", "region", "region_extended"]], on="gene_id", how="left")
     if merged["region"].isnull().any():
         missing = merged[merged["region"].isnull()]["gene_id"].tolist()
         sys.exit(f"ERROR:region_not_found:{','.join(missing)}")
@@ -649,6 +836,6 @@ process RESOLVE_GOI {
     merged["label"] = merged["description"].fillna("").str.strip()
     merged.loc[merged["label"] == "", "label"] = merged["gene_id"]
 
-    merged[["gene_id", "region", "label"]].to_csv("goi.resolved.tsv", sep="\t", index=False)
+    merged[["gene_id", "region", "region_extended", "label"]].to_csv("goi.resolved.tsv", sep="\\t", index=False)
     """
 }
