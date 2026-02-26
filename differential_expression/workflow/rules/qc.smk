@@ -92,23 +92,44 @@ rule annotation_bed:
                 dst.write(f"{chrom}\t{start}\t{end}\t{name}\t0\t{strand}\n")
 
 
-rule infer_strandness_map:
-    input:
-        fq1="results/fastp/{run}.fastp.fastq.gz",
-        idx="resources/genome/STAR_index"
-    output:
-        aln=temp("results/qc/rseqc/{run}.strand_infer.bam"),
-        log=temp("results/qc/rseqc/{run}.strand_infer.Log.out"),
-        log_final=temp("results/qc/rseqc/{run}.strand_infer.Log.final.out"),
-        unmapped=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
-        sj=temp("results/qc/rseqc/{run}.strand_infer.SJ.out.tab")
-    params:
-        extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
-    threads: AUX_THREADS
-    log:
-        "logs/star/{run}.infer_strandness_map.log"
-    wrapper:
-        "v7.2.0/bio/star/align"
+if IS_PAIRED_END:
+    rule infer_strandness_map:
+        input:
+            fq1="results/fastp/{run}_1.fastp.fastq.gz",
+            fq2="results/fastp/{run}_2.fastp.fastq.gz",
+            idx="resources/genome/STAR_index"
+        output:
+            aln=temp("results/qc/rseqc/{run}.strand_infer.bam"),
+            log=temp("results/qc/rseqc/{run}.strand_infer.Log.out"),
+            log_final=temp("results/qc/rseqc/{run}.strand_infer.Log.final.out"),
+            unmapped=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
+            unmapped2=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate2"),
+            sj=temp("results/qc/rseqc/{run}.strand_infer.SJ.out.tab")
+        params:
+            extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
+        threads: AUX_THREADS
+        log:
+            "logs/star/{run}.infer_strandness_map.log"
+        wrapper:
+            "v7.2.0/bio/star/align"
+else:
+    rule infer_strandness_map:
+        input:
+            fq1="results/fastp/{run}.fastp.fastq.gz",
+            idx="resources/genome/STAR_index"
+        output:
+            aln=temp("results/qc/rseqc/{run}.strand_infer.bam"),
+            log=temp("results/qc/rseqc/{run}.strand_infer.Log.out"),
+            log_final=temp("results/qc/rseqc/{run}.strand_infer.Log.final.out"),
+            unmapped=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
+            sj=temp("results/qc/rseqc/{run}.strand_infer.SJ.out.tab")
+        params:
+            extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
+        threads: AUX_THREADS
+        log:
+            "logs/star/{run}.infer_strandness_map.log"
+        wrapper:
+            "v7.2.0/bio/star/align"
 
 
 rule infer_strandness_report:

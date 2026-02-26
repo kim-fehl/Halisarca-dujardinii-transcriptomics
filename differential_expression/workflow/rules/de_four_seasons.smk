@@ -1,68 +1,29 @@
-rule prepare_de_data:
-    input:
-        counts="results/counts/counts_exons.tsv.gz",
-        metadata="config/samples_metadata.tsv"
-    output:
-        rds="results/de/data/de_data.rds",
-        metadata="results/de/data/sample_metadata.tsv"
-    conda:
-        "../envs/r_de.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/prepare_de_data.R \
-            --counts {input.counts} \
-            --metadata {input.metadata} \
-            --output-rds {output.rds} \
-            --output-metadata {output.metadata}
-        """
+DE_CFG = config.get("de", {}) or {}
+DE_BASELINE_LEVEL = str(DE_CFG.get("baseline_level", "Body"))
+_raw_compare_levels = DE_CFG.get("compare_levels", None)
+if _raw_compare_levels is None:
+    DE_COMPARE_LEVELS = None
+elif isinstance(_raw_compare_levels, (list, tuple)):
+    DE_COMPARE_LEVELS = [str(x) for x in _raw_compare_levels]
+else:
+    DE_COMPARE_LEVELS = [
+        str(x).strip() for x in str(_raw_compare_levels).split(",") if str(x).strip()
+    ]
 
+HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "24h_Autumn12")
+HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj.rds"
+HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR.tsv"
 
-rule combat_ref_repo:
-    output:
-        head="workflow/scripts/Combat-ref/.git/HEAD"
-    shell:
-        """
-        set -euo pipefail
-        mkdir -p workflow/scripts
-        if [ -d workflow/scripts/Combat-ref ]; then
-            rm -rf workflow/scripts/Combat-ref
-        fi
-        git clone --depth 1 --recurse-submodules https://github.com/xiaoyu12/Combat-ref workflow/scripts/Combat-ref
-        git -C workflow/scripts/Combat-ref submodule update --init --recursive
-        touch {output.head}
-        """
-
-
-rule combat_seq_counts:
-    input:
-        rds=rules.prepare_de_data.output.rds
-    output:
-        rds="results/de/data/combat_seq_counts.rds"
-    conda:
-        "../envs/r_de.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/run_combat_seq.R \
-            --input-rds {input.rds} \
-            --output-rds {output.rds}
-        """
-
-
-rule combat_ref_counts:
-    input:
-        rds=rules.prepare_de_data.output.rds,
-        repo=rules.combat_ref_repo.output.head
-    output:
-        rds="results/de/data/combat_ref_counts.rds"
-    conda:
-        "../envs/r_de.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/run_combat_ref.R \
-            --input-rds {input.rds} \
-            --output-rds {output.rds} \
-            --repo-dir workflow/scripts/Combat-ref
-        """
+if DE_BASELINE_LEVEL != "Body":
+    raise ValueError(
+        "The current 4-season DE/heatmap module assumes de.baseline_level='Body'. "
+        "Use the default or generalize the downstream R scripts first."
+    )
+if DE_COMPARE_LEVELS is not None and sorted(DE_COMPARE_LEVELS) != ["Aggregates", "Cells"]:
+    raise ValueError(
+        "The current 4-season DE/heatmap module assumes de.compare_levels contains "
+        "Cells and Aggregates. Use the default or generalize the downstream R scripts first."
+    )
 
 
 rule edgeR_results:
@@ -70,32 +31,18 @@ rule edgeR_results:
         rds=rules.prepare_de_data.output.rds
     output:
         tsv="results/de/edgeR/results_long.tsv.gz"
+    params:
+        baseline_level=lambda wildcards: DE_BASELINE_LEVEL,
+        compare_levels=lambda wildcards: ",".join(DE_COMPARE_LEVELS) if DE_COMPARE_LEVELS else ""
     conda:
         "../envs/r_de.yaml"
     shell:
         """
         Rscript workflow/scripts/run_edgeR.R \
             --input-rds {input.rds} \
-            --output-tsv {output.tsv}
-        """
-
-
-rule pca_batch_correction:
-    input:
-        data=rules.prepare_de_data.output.rds,
-        combat_seq=rules.combat_seq_counts.output.rds,
-        combat_ref=rules.combat_ref_counts.output.rds
-    output:
-        pdf="results/de/plots/pca_batch_correction.pdf"
-    conda:
-        "../envs/r_de.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/plot_pca_batch.R \
-            --input-rds {input.data} \
-            --combat-seq {input.combat_seq} \
-            --combat-ref {input.combat_ref} \
-            --output {output.pdf}
+            --output-tsv {output.tsv} \
+            --baseline-level '{params.baseline_level}' \
+            --compare-levels '{params.compare_levels}'
         """
 
 

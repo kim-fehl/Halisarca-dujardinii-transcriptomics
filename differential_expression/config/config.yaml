@@ -1,6 +1,8 @@
 project:
   name: hd_rnaseq
   metadata: config/samples_metadata.tsv
+  samplesheet_path: config/samplesheet.csv
+  fastq_path: .  # prefix for relative FASTQ paths in samplesheet_path (e.g. fetchngs output dir)
 
 genome:
   name: SkHd2
@@ -15,6 +17,18 @@ processing:
   star_sa_index_n_bases: 12
   volcano_fold_threshold: 1.5
   volcano_fdr_threshold: 0.01
+
+heatmap:
+  set_name: 24h_Autumn12  # used for intermediate heatmap input filenames and labels
+
+de:
+  stratum_column: season
+  condition_column: aggregation_stage
+  baseline_level: Body
+  compare_levels: [Cells, Aggregates]
+
+batch_correction:
+  enabled: auto  # auto|true|false; auto runs only if de.stratum_column has >1 level in metadata
 
 genesets:
   - name: heatshocks

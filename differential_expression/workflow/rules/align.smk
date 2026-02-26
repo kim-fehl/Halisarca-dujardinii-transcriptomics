@@ -51,23 +51,44 @@ rule star_genome_index:
         "v7.2.0/bio/star/index"
 
 
-rule star_align_single_end:
-    input:
-        fq1="results/fastp/{run}.fastp.fastq.gz",
-        idx="resources/genome/STAR_index",
-        strand="results/qc/rseqc/{run}.strand.txt"
-    output:
-        aln="results/bam/{run}_Aligned.out.bam",
-        log="results/bam/{run}_Log.out",
-        log_final="results/bam/{run}_Log.final.out",
-        unmapped="results/bam/{run}_Unmapped.out.mate1"
-    params:
-        extra=lambda wildcards, input: _star_align_extra(input.strand)
-    threads: MAX_THREADS
-    log:
-        "logs/star/align/{run}.log"
-    wrapper:
-        "v7.2.0/bio/star/align"
+if IS_PAIRED_END:
+    rule star_align_paired_end:
+        input:
+            fq1="results/fastp/{run}_1.fastp.fastq.gz",
+            fq2="results/fastp/{run}_2.fastp.fastq.gz",
+            idx="resources/genome/STAR_index",
+            strand="results/qc/rseqc/{run}.strand.txt"
+        output:
+            aln="results/bam/{run}_Aligned.out.bam",
+            log="results/bam/{run}_Log.out",
+            log_final="results/bam/{run}_Log.final.out",
+            unmapped="results/bam/{run}_Unmapped.out.mate1",
+            unmapped2="results/bam/{run}_Unmapped.out.mate2"
+        params:
+            extra=lambda wildcards, input: _star_align_extra(input.strand)
+        threads: MAX_THREADS
+        log:
+            "logs/star/align/{run}.log"
+        wrapper:
+            "v7.2.0/bio/star/align"
+else:
+    rule star_align_single_end:
+        input:
+            fq1="results/fastp/{run}.fastp.fastq.gz",
+            idx="resources/genome/STAR_index",
+            strand="results/qc/rseqc/{run}.strand.txt"
+        output:
+            aln="results/bam/{run}_Aligned.out.bam",
+            log="results/bam/{run}_Log.out",
+            log_final="results/bam/{run}_Log.final.out",
+            unmapped="results/bam/{run}_Unmapped.out.mate1"
+        params:
+            extra=lambda wildcards, input: _star_align_extra(input.strand)
+        threads: MAX_THREADS
+        log:
+            "logs/star/align/{run}.log"
+        wrapper:
+            "v7.2.0/bio/star/align"
 
 
 rule sort_bam:

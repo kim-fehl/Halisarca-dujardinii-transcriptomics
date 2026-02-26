@@ -12,7 +12,11 @@ suppressPackageStartupMessages({
 
 option_list <- list(
   make_option(c("-i", "--input-rds"), type = "character", dest = "input_rds", help = "RDS produced by prepare_de_data.R"),
-  make_option(c("-o", "--output-tsv"), type = "character", dest = "output_tsv", help = "Output TSV.gz with edgeR results")
+  make_option(c("-o", "--output-tsv"), type = "character", dest = "output_tsv", help = "Output TSV.gz with edgeR results"),
+  make_option("--baseline-level", type = "character", dest = "baseline_level", default = "Body",
+              help = "Reference condition level [default %default]"),
+  make_option("--compare-levels", type = "character", dest = "compare_levels", default = "",
+              help = "Comma-separated condition levels to compare vs baseline (default: all non-baseline)")
 )
 
 parser <- OptionParser(option_list = option_list)
@@ -33,8 +37,8 @@ if (is.null(counts) || is.null(metadata)) {
 metadata <- metadata %>%
   mutate(
     sample_id = as.character(sample_id),
-    season = factor(as.character(season), levels = c("Autumn", "Winter", "Spring", "Summer")),
-    condition = factor(as.character(condition), levels = c("Body", "Cells", "Aggregates"))
+    season = factor(as.character(season)),
+    condition = factor(as.character(condition))
   ) %>%
   mutate(order_index = match(sample_id, colnames(counts))) %>%
   filter(!is.na(order_index)) %>%
@@ -59,19 +63,39 @@ design <- model.matrix(~0 + group)
 colnames(design) <- levels(group)
 
 contrast_exprs <- setNames(character(0), character(0))
+baseline_level <- as.character(opt$baseline_level)
+requested_compare_levels <- strsplit(opt$compare_levels, ",", fixed = TRUE)[[1]]
+requested_compare_levels <- trimws(requested_compare_levels)
+requested_compare_levels <- requested_compare_levels[nzchar(requested_compare_levels)]
 
 seasons <- levels(metadata$season)
+available_conditions <- levels(metadata$condition)
+if (!(baseline_level %in% available_conditions)) {
+  stop(sprintf("Baseline level '%s' not found in condition levels: %s",
+               baseline_level, paste(available_conditions, collapse = ", ")), call. = FALSE)
+}
+
+compare_levels <- if (length(requested_compare_levels)) {
+  setdiff(requested_compare_levels, baseline_level)
+} else {
+  setdiff(available_conditions, baseline_level)
+}
+
+sanitize_id <- function(x) gsub("[^A-Za-z0-9._-]+", "_", x)
+escape_regex <- function(x) gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", x)
+
 for (season in seasons) {
   if (is.na(season)) next
-  base <- paste0(season, ".Body")
+  base <- paste0(season, ".", baseline_level)
   if (!(base %in% colnames(design))) next
-  cells <- paste0(season, ".Cells")
-  aggregates <- paste0(season, ".Aggregates")
-  if (cells %in% colnames(design)) {
-    contrast_exprs[paste0(season, "_Cells_vs_Body")] <- sprintf("%s - %s", cells, base)
-  }
-  if (aggregates %in% colnames(design)) {
-    contrast_exprs[paste0(season, "_Aggregates_vs_Body")] <- sprintf("%s - %s", aggregates, base)
+  for (compare_level in compare_levels) {
+    target <- paste0(season, ".", compare_level)
+    if (!(target %in% colnames(design))) next
+    contrast_name <- sprintf("%s_%s_vs_%s",
+                             sanitize_id(season),
+                             sanitize_id(compare_level),
+                             sanitize_id(baseline_level))
+    contrast_exprs[contrast_name] <- sprintf("%s - %s", target, base)
   }
 }
 
@@ -116,7 +140,7 @@ results_long <- bind_rows(result_tables) %>%
   mutate(
     season = str_replace(contrast, "(_.*)$", ""),
     comparison = str_replace(contrast, "^[^_]+_", ""),
-    condition = str_replace(comparison, "_vs_Body", ""),
+    condition = str_replace(comparison, paste0("_vs_", escape_regex(sanitize_id(baseline_level))), ""),
     logCPM = logCPM,
     logFC = logFC,
     PValue = PValue

@@ -6,8 +6,6 @@ channels:
 dependencies:
   - python=3.10
   - pandas
-  - sra-tools
-  - pigz
   - fastp
   - star
   - sambamba

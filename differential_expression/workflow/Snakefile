@@ -1,118 +1,31 @@
-import os
-import re
-from pathlib import Path
-
-import pandas as pd
-
 configfile: "config/config.yaml"
 
 shell.executable("/bin/bash")
 shell.prefix("set -euo pipefail; ")
 
-metadata_df = pd.read_csv(Path(config["project"]["metadata"]).expanduser(), sep="\t", encoding="utf-16")
-metadata_df.columns = [str(col).strip() for col in metadata_df.columns]
-metadata_df = metadata_df.dropna(subset=["run_accession"])  # ensure essential column exists
-metadata_df["run_accession"] = metadata_df["run_accession"].astype(str)
-
-name_columns = [
-    col
-    for col in ("library_name", "sample_accession", "biosample")
-    if col in metadata_df.columns
-]
-
-if name_columns:
-    def _derive_sample_name(row):
-        for col in name_columns:
-            value = row.get(col)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return row["run_accession"]
-else:
-    def _derive_sample_name(row):
-        return row["run_accession"]
-
-metadata_df["sample_id"] = (
-    metadata_df.apply(_derive_sample_name, axis=1)
-    .map(lambda name: re.sub(r"[^A-Za-z0-9._-]+", "_", name))
-)
-
-RUN_TO_SAMPLE = dict(zip(metadata_df["run_accession"], metadata_df["sample_id"]))
-RUN_IDS = sorted(RUN_TO_SAMPLE.keys())
-SAMPLE_IDS = sorted(set(RUN_TO_SAMPLE.values()))
-if not RUN_IDS:
-    raise ValueError("No run_accession entries found in metadata")
-PRIMARY_RUN = RUN_IDS[0]
-
-MAX_THREADS = max(1, workflow.cores or 1)
-AUX_THREADS = max(1, MAX_THREADS // 4)
-
-
-def _expand_path(path):
-    return os.path.expanduser(path) if isinstance(path, str) else path
-
-
-def _slugify(value):
-    if value is None:
-        return None
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip())
-    return slug or None
-
-
-heatmap_cfg = config.get("heatmap", {}) or {}
-HEATMAP_SET_NAME = "24h_Autumn12" # Autumn replicates #3 are excluded
-HEATMAP_GENOME_NAME = config.get("genome").get("name") 
-HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj.rds"
-HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR.tsv"
-
-_raw_genesets = config.get("genesets") or []
-if not _raw_genesets:
-    raise ValueError("config['genesets'] must contain at least one entry")
-
-HEATMAP_GENESETS = []
-for entry in _raw_genesets:
-    path = _expand_path(entry.get("path"))
-    if not path:
-        raise ValueError("Each heatmap geneset requires a 'path'")
-    name = entry.get("name") or Path(path).stem
-    slug = _slugify(name)
-    if not slug:
-        raise ValueError(f"Invalid heatmap geneset name derived from '{name}'")
-    HEATMAP_GENESETS.append({
-        "name": slug,
-        "path": path,
-        "pdf": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}.pdf",
-        "xlsx": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}.xlsx",
-    })
-
-_names = [g["name"] for g in HEATMAP_GENESETS]
-if len(set(_names)) != len(_names):
-    raise ValueError("Heatmap geneset names must be unique")
-
-HEATMAP_GENESET_MAP = {g["name"]: g for g in HEATMAP_GENESETS}
-HEATMAP_GENESET_NAMES = sorted(HEATMAP_GENESET_MAP.keys())
-HEATMAP_PDF_TARGETS = [HEATMAP_GENESET_MAP[name]["pdf"] for name in HEATMAP_GENESET_NAMES]
-HEATMAP_XLSX_TARGETS = [HEATMAP_GENESET_MAP[name]["xlsx"] for name in HEATMAP_GENESET_NAMES]
-
-ruleorder: sort_bam > featurecounts
-
-include: "rules/download.smk"
+include: "rules/sample_context.smk"
+include: "rules/heatmap_context.smk"
+include: "rules/input_fastq.smk"
 include: "rules/preprocess.smk"
 include: "rules/qc.smk"
 include: "rules/align.smk"
 include: "rules/quantify.smk"
-include: "rules/de.smk"
+include: "rules/batch_corr.smk"
+include: "rules/de_four_seasons.smk"
+include: "rules/targets.smk"
+
+
+rule pre_de:
+    input:
+        *PRE_DE_TARGETS
+
+
+rule de_four_seasons:
+    input:
+        *FOUR_SEASONS_DE_TARGETS
+
 
 rule all:
     input:
-        "results/counts/counts_exons.tsv.gz",
-        "results/qc/multiqc_fastp/multiqc_report.html",
-        "results/qc/multiqc_fastp_star/multiqc_report.html",
-        "results/qc/rseqc/featurecounts_strand.txt",
-        "results/de/edgeR/results_long.tsv.gz",
-        "results/de/plots/pca_batch_correction.pdf",
-        "results/de/plots/volcano_plot.png",
-        "results/de/stats/volcano_counts.tsv",
-        HEATMAP_DATA_RDS,
-        HEATMAP_SAMPLE_STATS,
-        *HEATMAP_PDF_TARGETS,
-        *HEATMAP_XLSX_TARGETS
+        *PRE_DE_TARGETS,
+        *FOUR_SEASONS_DE_TARGETS
