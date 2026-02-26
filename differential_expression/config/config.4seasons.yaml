@@ -1,5 +1,5 @@
 project:
-  name: hd_rnaseq
+  name: aggr24h_4seasons
   metadata: config/samples_metadata.tsv
   samplesheet_path: config/samplesheet.csv
   fastq_path: .  # prefix for relative FASTQ paths in samplesheet_path (e.g. fetchngs output dir)
@@ -19,7 +19,7 @@ processing:
   volcano_fdr_threshold: 0.01
 
 heatmap:
-  set_name: 24h_Autumn12  # used for intermediate heatmap input filenames and labels
+  set_name: aggr24h_4seasons  # used for intermediate heatmap input filenames and labels
 
 de:
   stratum_column: season

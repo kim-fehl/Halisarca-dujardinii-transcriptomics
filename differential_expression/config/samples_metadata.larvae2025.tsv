@@ -1,0 +1,10 @@
+run_accession	sample_name	sample_id	stratum	BiologicalState	replicate	USE	Comment
+OKr_19	2_1	2_1	batch1	aggr24h_freeswim	1	TRUE	
+OKr_20	2_2	2_2	batch1	aggr24h_freeswim	2	TRUE	
+OKr_21	2_3	2_3	batch1	aggr24h_freeswim	3	TRUE	
+OKr_22	3_1	3_1	batch1	intact_body	1	TRUE	
+OKr_23	3_2	3_2	batch1	intact_body	2	TRUE	
+OKr_24	3_3	3_3	batch1	intact_body	3	TRUE	
+OKr_27	5_1	5_1	batch1	larvae_fromtissue	1	TRUE	
+OKr_28	5_2	5_2	batch1	larvae_fromtissue	2	TRUE	
+OKr_29	5_3	5_3	batch1	larvae_fromtissue	3	TRUE	

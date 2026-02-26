@@ -14,21 +14,27 @@ HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "24h_Autumn
 HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj.rds"
 HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR.tsv"
 
-if DE_BASELINE_LEVEL != "Body":
-    raise ValueError(
-        "The current 4-season DE/heatmap module assumes de.baseline_level='Body'. "
-        "Use the default or generalize the downstream R scripts first."
-    )
-if DE_COMPARE_LEVELS is not None and sorted(DE_COMPARE_LEVELS) != ["Aggregates", "Cells"]:
-    raise ValueError(
-        "The current 4-season DE/heatmap module assumes de.compare_levels contains "
-        "Cells and Aggregates. Use the default or generalize the downstream R scripts first."
-    )
+
+rule validate_de_four_seasons_config:
+    output:
+        touch("results/de/.de_four_seasons_config.valid")
+    run:
+        if DE_BASELINE_LEVEL != "Body":
+            raise ValueError(
+                "The current 4-season DE/heatmap module assumes de.baseline_level='Body'. "
+                "Use the default or generalize the downstream R scripts first."
+            )
+        if DE_COMPARE_LEVELS is not None and sorted(DE_COMPARE_LEVELS) != ["Aggregates", "Cells"]:
+            raise ValueError(
+                "The current 4-season DE/heatmap module assumes de.compare_levels contains "
+                "Cells and Aggregates. Use the default or generalize the downstream R scripts first."
+            )
 
 
 rule edgeR_results:
     input:
-        rds=rules.prepare_de_data.output.rds
+        rds=rules.prepare_de_data.output.rds,
+        cfg=rules.validate_de_four_seasons_config.output
     output:
         tsv="results/de/edgeR/results_long.tsv.gz"
     params:

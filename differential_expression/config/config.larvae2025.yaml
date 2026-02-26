@@ -1,0 +1,34 @@
+project:
+  name: larvae2025
+  metadata: config/samples_metadata.larvae2025.tsv
+  samplesheet_path: config/samplesheet.larvae2025.csv
+  fastq_path: /home/lab/kim/hd/rnaseq/2025_08_larvae
+genome:
+  name: hd202006
+  fasta: /home/lab/kim/hd/genome/235r/hd_202006_masurca_red235.fna
+  annotation: /home/lab/kim/hd/genome/235r/hd_202006_maker_exons_v2_ribo.gff
+
+processing:
+  fastp_min_length: 25
+  fastp_extra: "-y -p -5 -3 -r -W 5"
+  featurecounts_extra: "-M --fraction -t exon -g Parent"
+  infer_experiment_read_limit: 200000
+  star_sa_index_n_bases: 12
+  volcano_fold_threshold: 1.5
+  volcano_fdr_threshold: 0.01
+
+heatmap:
+  set_name: larvae2025  # only used by current de_four_seasons heatmap module
+
+de:
+  stratum_column: stratum
+  condition_column: BiologicalState
+  baseline_level: intact_body
+  compare_levels: [larvae_fromtissue, aggr24h_freeswim]
+
+batch_correction:
+  enabled: false  # single stratum dataset; no ComBat/PCA batch correction
+
+genesets:
+  - name: heatshocks
+    path: config/genesets/hd_heatshocks_SkHd2.xlsx
