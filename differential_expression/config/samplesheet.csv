@@ -1,0 +1,10 @@
+run_accession,fastq_1,fastq_2,single_end
+OKr_19,OKr_19_S36_R1_001.fastq.gz,OKr_19_S36_R2_001.fastq.gz,false
+OKr_20,OKr_20_S37_R1_001.fastq.gz,OKr_20_S37_R2_001.fastq.gz,false
+OKr_21,OKr_21_S38_R1_001.fastq.gz,OKr_21_S38_R2_001.fastq.gz,false
+OKr_22,OKr_22_S39_R1_001.fastq.gz,OKr_22_S39_R2_001.fastq.gz,false
+OKr_23,OKr_23_S40_R1_001.fastq.gz,OKr_23_S40_R2_001.fastq.gz,false
+OKr_24,OKr_24_S41_R1_001.fastq.gz,OKr_24_S41_R2_001.fastq.gz,false
+OKr_27,OKr_27_S43_R1_001.fastq.gz,OKr_27_S43_R2_001.fastq.gz,false
+OKr_28,OKr_28_S44_R1_001.fastq.gz,OKr_28_S44_R2_001.fastq.gz,false
+OKr_29,OKr_29_S45_R1_001.fastq.gz,OKr_29_S45_R2_001.fastq.gz,false
