@@ -62,8 +62,10 @@ if IS_PAIRED_END:
             aln="results/bam/{run}_Aligned.out.bam",
             log="results/bam/{run}_Log.out",
             log_final="results/bam/{run}_Log.final.out",
-            unmapped="results/bam/{run}_Unmapped.out.mate1",
-            unmapped2="results/bam/{run}_Unmapped.out.mate2"
+            unmapped=[
+                "results/bam/{run}_Unmapped.out.mate1",
+                "results/bam/{run}_Unmapped.out.mate2",
+            ]
         params:
             extra=lambda wildcards, input: _star_align_extra(input.strand)
         threads: MAX_THREADS

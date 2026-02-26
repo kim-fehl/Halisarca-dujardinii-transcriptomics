@@ -102,8 +102,10 @@ if IS_PAIRED_END:
             aln=temp("results/qc/rseqc/{run}.strand_infer.bam"),
             log=temp("results/qc/rseqc/{run}.strand_infer.Log.out"),
             log_final=temp("results/qc/rseqc/{run}.strand_infer.Log.final.out"),
-            unmapped=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
-            unmapped2=temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate2"),
+            unmapped=[
+                temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate1"),
+                temp("results/qc/rseqc/{run}.strand_infer.Unmapped.out.mate2"),
+            ],
             sj=temp("results/qc/rseqc/{run}.strand_infer.SJ.out.tab")
         params:
             extra=lambda wildcards: _infer_star_extra(int(config["processing"].get("infer_experiment_read_limit", 200000)))
