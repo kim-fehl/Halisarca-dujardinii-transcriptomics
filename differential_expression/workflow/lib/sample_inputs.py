@@ -5,8 +5,13 @@ from pathlib import Path
 import pandas as pd
 
 
-def _expand_path(path):
-    return os.path.expanduser(path) if isinstance(path, str) else path
+def _expand_path(path, base_dir=None):
+    if not isinstance(path, str):
+        return path
+    p = Path(os.path.expanduser(path))
+    if base_dir is not None and not p.is_absolute():
+        p = Path(base_dir) / p
+    return str(p)
 
 
 def _read_delimited_table(path, *, sep=None, label="table"):
@@ -57,11 +62,15 @@ def _as_bool_or_none(value):
     return None
 
 
-def load_sample_context(config, cores):
+def load_sample_context(config, cores, workflow_basedir=None):
+    project_root = None
+    if workflow_basedir is not None:
+        project_root = Path(workflow_basedir).resolve().parent
+
     project_cfg = config.get("project", {}) or {}
-    metadata_path = Path(project_cfg["metadata"]).expanduser()
-    samplesheet_path = Path(project_cfg["samplesheet_path"]).expanduser()
-    fastq_base_path = Path(_expand_path(project_cfg.get("fastq_path", "."))).expanduser()
+    metadata_path = Path(_expand_path(project_cfg["metadata"], base_dir=project_root)).expanduser()
+    samplesheet_path = Path(_expand_path(project_cfg["samplesheet_path"], base_dir=project_root)).expanduser()
+    fastq_base_path = Path(_expand_path(project_cfg.get("fastq_path", "."), base_dir=project_root)).expanduser()
 
     metadata_df = _read_delimited_table(metadata_path, sep="\t", label="metadata")
     if "run_accession" not in metadata_df.columns:

@@ -1,7 +1,16 @@
-from workflow.lib.sample_inputs import load_sample_context
+import sys
+from pathlib import Path
 
 
-_sample_ctx = load_sample_context(config=config, cores=workflow.cores)
+sys.path.insert(0, str(Path(workflow.basedir) / "lib"))
+from sample_inputs import load_sample_context
+
+
+_sample_ctx = load_sample_context(
+    config=config,
+    cores=workflow.cores,
+    workflow_basedir=workflow.basedir,
+)
 
 metadata_df = _sample_ctx["metadata_df"]
 RUN_TO_FASTQ_R1 = _sample_ctx["RUN_TO_FASTQ_R1"]
