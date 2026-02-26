@@ -12,6 +12,7 @@ rule featurecounts:
     log:
         f"logs/featurecounts/featurecounts.log"
     params:
+        paired_extra=lambda wildcards: "-p --countReadPairs" if IS_PAIRED_END else "",
         extra=lambda wildcards: config["processing"].get("featurecounts_extra", "")
     threads: MAX_THREADS
     conda:
@@ -24,6 +25,7 @@ rule featurecounts:
             -T {threads} \
             -a {input.annotation} \
             -o {output.counts} \
+            {params.paired_extra} \
             -s $strand \
             {params.extra} \
             {input.bam} \
