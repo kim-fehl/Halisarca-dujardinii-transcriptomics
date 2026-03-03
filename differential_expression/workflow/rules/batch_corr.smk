@@ -126,3 +126,28 @@ if BATCH_CORR_ENABLED:
                 --combat-ref {input.combat_ref} \
                 --output {output.pdf}
             """
+
+
+    rule pca_general:
+        input:
+            pdf=rules.pca_batch_correction.output.pdf
+        output:
+            pdf="results/de/plots/pca_general.pdf"
+        shell:
+            """
+            cp {input.pdf} {output.pdf}
+            """
+else:
+    rule pca_general:
+        input:
+            data=rules.prepare_de_data.output.rds
+        output:
+            pdf="results/de/plots/pca_general.pdf"
+        conda:
+            "../envs/r_de.yaml"
+        shell:
+            """
+            Rscript workflow/scripts/plot_pca_general.R \
+                --input-rds {input.data} \
+                --output {output.pdf}
+            """

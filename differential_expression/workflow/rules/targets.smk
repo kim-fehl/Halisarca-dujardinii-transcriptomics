@@ -18,10 +18,8 @@ PRE_DE_TARGETS = [
     "results/qc/multiqc_fastp/multiqc_report.html",
     "results/qc/multiqc_fastp_star/multiqc_report.html",
     "results/qc/rseqc/featurecounts_strand.txt",
+    rules.pca_general.output.pdf,
 ]
-
-if BATCH_CORR_ENABLED:
-    PRE_DE_TARGETS.append(rules.pca_batch_correction.output.pdf)
 
 FOUR_SEASONS_DE_TARGETS = [
     rules.edgeR_results_four_seasons.output.tsv,
