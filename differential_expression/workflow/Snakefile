@@ -31,6 +31,18 @@ rule de_general:
         *GENERAL_DE_TARGETS
 
 
+rule heatmap_four_seasons:
+    input:
+        *HEATMAP_PDF_FOUR_SEASONS_TARGETS,
+        *HEATMAP_XLSX_FOUR_SEASONS_TARGETS
+
+
+rule heatmap_general:
+    input:
+        *HEATMAP_PDF_GENERAL_TARGETS,
+        *HEATMAP_XLSX_GENERAL_TARGETS
+
+
 rule all:
     input:
         *PRE_DE_TARGETS,

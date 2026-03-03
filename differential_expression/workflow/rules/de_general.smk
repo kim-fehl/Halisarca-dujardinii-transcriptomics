@@ -10,6 +10,10 @@ else:
         str(x).strip() for x in str(_raw_general_compare_levels).split(",") if str(x).strip()
     ]
 
+GENERAL_HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "general")
+GENERAL_HEATMAP_DATA_RDS = f"results/de/data/{GENERAL_HEATMAP_SET_NAME}_cpm_lfc_padj_general.rds"
+GENERAL_HEATMAP_SAMPLE_STATS = f"results/de/data/{GENERAL_HEATMAP_SET_NAME}_samples_stats_general.tsv"
+
 
 rule edgeR_results_general:
     input:
@@ -70,4 +74,52 @@ rule volcano_stats_general:
             --output {output.tsv} \
             --lfc-fold {params.lfc_fold} \
             --fdr {params.fdr}
+        """
+
+
+rule heatmap_data_general:
+    input:
+        rds=rules.prepare_de_data.output.rds,
+        results=rules.edgeR_results_general.output.tsv
+    output:
+        cpm_lfc=GENERAL_HEATMAP_DATA_RDS,
+        sample_stats=GENERAL_HEATMAP_SAMPLE_STATS
+    params:
+        baseline_level=DE_GENERAL_BASELINE_LEVEL
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/prepare_heatmap_inputs_general.R \
+            --input-rds '{input.rds}' \
+            --edgeR-tsv '{input.results}' \
+            --baseline-level '{params.baseline_level}' \
+            --output-rds '{output.cpm_lfc}' \
+            --samples-stats '{output.sample_stats}'
+        """
+
+
+rule heatmap_plot_general:
+    input:
+        cpm=GENERAL_HEATMAP_DATA_RDS,
+        sample_stats=GENERAL_HEATMAP_SAMPLE_STATS,
+        geneset=lambda wildcards: HEATMAP_GENESET_MAP[wildcards.geneset]["path"]
+    output:
+        pdf=f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}_general.pdf",
+        xlsx=f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}_general.xlsx"
+    params:
+        baseline_level=DE_GENERAL_BASELINE_LEVEL,
+        genome=HEATMAP_GENOME_NAME
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/heatmap_general.R \
+            --cpm-rds '{input.cpm}' \
+            --sample-stats '{input.sample_stats}' \
+            --geneset '{input.geneset}' \
+            --baseline-level '{params.baseline_level}' \
+            --genome-name '{params.genome}' \
+            --output-pdf '{output.pdf}' \
+            --output-xlsx '{output.xlsx}'
         """

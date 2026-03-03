@@ -37,8 +37,10 @@ for entry in _raw_genesets:
     HEATMAP_GENESETS.append({
         "name": slug,
         "path": path,
-        "pdf": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.pdf",
-        "xlsx": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.xlsx",
+        "pdf_four_seasons": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.pdf",
+        "xlsx_four_seasons": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.xlsx",
+        "pdf_general": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}_general.pdf",
+        "xlsx_general": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}_general.xlsx",
     })
 
 _names = [g["name"] for g in HEATMAP_GENESETS]
@@ -47,5 +49,7 @@ if len(set(_names)) != len(_names):
 
 HEATMAP_GENESET_MAP = {g["name"]: g for g in HEATMAP_GENESETS}
 HEATMAP_GENESET_NAMES = sorted(HEATMAP_GENESET_MAP.keys())
-HEATMAP_PDF_TARGETS = [HEATMAP_GENESET_MAP[name]["pdf"] for name in HEATMAP_GENESET_NAMES]
-HEATMAP_XLSX_TARGETS = [HEATMAP_GENESET_MAP[name]["xlsx"] for name in HEATMAP_GENESET_NAMES]
+HEATMAP_PDF_FOUR_SEASONS_TARGETS = [HEATMAP_GENESET_MAP[name]["pdf_four_seasons"] for name in HEATMAP_GENESET_NAMES]
+HEATMAP_XLSX_FOUR_SEASONS_TARGETS = [HEATMAP_GENESET_MAP[name]["xlsx_four_seasons"] for name in HEATMAP_GENESET_NAMES]
+HEATMAP_PDF_GENERAL_TARGETS = [HEATMAP_GENESET_MAP[name]["pdf_general"] for name in HEATMAP_GENESET_NAMES]
+HEATMAP_XLSX_GENERAL_TARGETS = [HEATMAP_GENESET_MAP[name]["xlsx_general"] for name in HEATMAP_GENESET_NAMES]

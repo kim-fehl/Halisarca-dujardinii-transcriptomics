@@ -29,12 +29,16 @@ FOUR_SEASONS_DE_TARGETS = [
     rules.volcano_stats_four_seasons.output.tsv,
     rules.heatmap_data_four_seasons.output.cpm_lfc,
     rules.heatmap_data_four_seasons.output.sample_stats,
-    *HEATMAP_PDF_TARGETS,
-    *HEATMAP_XLSX_TARGETS,
+    *HEATMAP_PDF_FOUR_SEASONS_TARGETS,
+    *HEATMAP_XLSX_FOUR_SEASONS_TARGETS,
 ]
 
 GENERAL_DE_TARGETS = [
     rules.edgeR_results_general.output.tsv,
     rules.volcano_plot_general.output.png,
     rules.volcano_stats_general.output.tsv,
+    rules.heatmap_data_general.output.cpm_lfc,
+    rules.heatmap_data_general.output.sample_stats,
+    *HEATMAP_PDF_GENERAL_TARGETS,
+    *HEATMAP_XLSX_GENERAL_TARGETS,
 ]
