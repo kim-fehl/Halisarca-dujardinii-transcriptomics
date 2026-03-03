@@ -59,13 +59,27 @@ read_metadata_table <- function(path) {
 
 metadata_raw <- read_metadata_table(opt$metadata)
 
-sample_id_col <- if ("sample_name" %in% names(metadata_raw)) {
-  "sample_name"
-} else if ("sample_id" %in% names(metadata_raw)) {
-  "sample_id"
-} else {
-  stop("Metadata must contain either 'sample_name' or 'sample_id'", call. = FALSE)
+sample_id_candidates <- c(
+  "sample_name",
+  "sample_id",
+  "Sk_sample_id",
+  "IDB_sample_id",
+  "library_name",
+  "run_accession"
+)
+sample_id_col <- sample_id_candidates[sample_id_candidates %in% names(metadata_raw)]
+if (length(sample_id_col) == 0) {
+  stop(
+    paste0(
+      "Metadata must contain one of sample ID columns: ",
+      paste(sample_id_candidates, collapse = ", "),
+      ". Found columns: ",
+      paste(names(metadata_raw), collapse = ", ")
+    ),
+    call. = FALSE
+  )
 }
+sample_id_col <- sample_id_col[[1]]
 
 required_meta_cols <- c("run_accession", opt$stratum_column, opt$condition_column, "replicate")
 missing_meta_cols <- setdiff(unique(required_meta_cols), names(metadata_raw))
