@@ -140,3 +140,23 @@ rule heatmap_plot_four_seasons:
             --output-pdf '{output.pdf}' \
             --output-xlsx '{output.xlsx}'
         """
+
+
+rule heatmap_zscore_replicates_four_seasons:
+    input:
+        rds=rules.prepare_de_data.output.rds,
+        geneset=lambda wildcards: HEATMAP_GENESET_MAP[wildcards.geneset]["path"]
+    output:
+        pdf=f"results/de/plots/heatmap_zscore_{HEATMAP_GENOME_NAME}_{{geneset}}_four_seasons.pdf"
+    params:
+        baseline_level=DE_BASELINE_LEVEL
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/heatmap_zscore_replicates.R \
+            --input-rds '{input.rds}' \
+            --geneset '{input.geneset}' \
+            --baseline-level '{params.baseline_level}' \
+            --output-pdf '{output.pdf}'
+        """

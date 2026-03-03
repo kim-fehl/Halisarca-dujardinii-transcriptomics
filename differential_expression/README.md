@@ -150,6 +150,6 @@ Notes:
 | QC | `results/qc/multiqc_fastp/*.html`, `results/qc/rseqc/featurecounts_strand.txt` |
 | PCA summary | `results/de/plots/pca_general.pdf` (raw PCA for one batch; batch-corrected panel for multi-batch) |
 | General DE | `results/de/edgeR/results_long_general.tsv.gz`, `results/de/plots/volcano_plot_general.png`, `results/de/stats/volcano_counts_general.tsv` |
-| General heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_general.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_general.xlsx` |
+| General heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_general.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_general.xlsx`, `results/de/plots/heatmap_zscore_<genome>_<geneset>_general.pdf` |
 | 4-season DE | `results/de/edgeR/results_long_four_seasons.tsv.gz`, `results/de/plots/volcano_plot_four_seasons.png`, `results/de/stats/volcano_counts_four_seasons.tsv` |
-| 4-season heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_four_seasons.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_four_seasons.xlsx` |
+| 4-season heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_four_seasons.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_four_seasons.xlsx`, `results/de/plots/heatmap_zscore_<genome>_<geneset>_four_seasons.pdf` |

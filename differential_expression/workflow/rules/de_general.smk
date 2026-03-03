@@ -123,3 +123,23 @@ rule heatmap_plot_general:
             --output-pdf '{output.pdf}' \
             --output-xlsx '{output.xlsx}'
         """
+
+
+rule heatmap_zscore_replicates_general:
+    input:
+        rds=rules.prepare_de_data.output.rds,
+        geneset=lambda wildcards: HEATMAP_GENESET_MAP[wildcards.geneset]["path"]
+    output:
+        pdf=f"results/de/plots/heatmap_zscore_{HEATMAP_GENOME_NAME}_{{geneset}}_general.pdf"
+    params:
+        baseline_level=DE_GENERAL_BASELINE_LEVEL
+    conda:
+        "../envs/r_de.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/heatmap_zscore_replicates.R \
+            --input-rds '{input.rds}' \
+            --geneset '{input.geneset}' \
+            --baseline-level '{params.baseline_level}' \
+            --output-pdf '{output.pdf}'
+        """

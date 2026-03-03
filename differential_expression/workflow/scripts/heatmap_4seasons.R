@@ -71,7 +71,7 @@ cond_labels   <- c('Body' = "intact body", 'Cells' = "dissociated cells", 'Aggre
 cond_shapes   <- c('Body' = 2, 'Cells' = 0, 'Aggregates' = 1)
 season_labels <- c('Winter' = 'Winter', 'Spring' = 'Spring', 'Summer' = 'Summer', 'Autumn' = 'Autumn')
 season_levels <- names(season_labels)
-hm_tiss_color_pal <- colorRamp2(c(0, 3, 4), c("#000000", "#17ffc6", "#baffee"))
+hm_tiss_color_pal <- colorRamp2(c(0, 1, 4), c("#baffee", "#17ffc6", "#000000"))
 
 name_column <- "name"
 descr_column <- "descr"

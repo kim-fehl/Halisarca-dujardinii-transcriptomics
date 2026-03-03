@@ -29,6 +29,7 @@ FOUR_SEASONS_DE_TARGETS = [
     rules.heatmap_data_four_seasons.output.sample_stats,
     *HEATMAP_PDF_FOUR_SEASONS_TARGETS,
     *HEATMAP_XLSX_FOUR_SEASONS_TARGETS,
+    *HEATMAP_ZSCORE_PDF_FOUR_SEASONS_TARGETS,
 ]
 
 GENERAL_DE_TARGETS = [
@@ -39,4 +40,5 @@ GENERAL_DE_TARGETS = [
     rules.heatmap_data_general.output.sample_stats,
     *HEATMAP_PDF_GENERAL_TARGETS,
     *HEATMAP_XLSX_GENERAL_TARGETS,
+    *HEATMAP_ZSCORE_PDF_GENERAL_TARGETS,
 ]

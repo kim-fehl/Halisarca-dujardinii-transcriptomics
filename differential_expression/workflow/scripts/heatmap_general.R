@@ -208,7 +208,7 @@ if (length(unknown_conditions)) {
   condition_colors[unknown_conditions] <- hue_pal()(length(unknown_conditions))
 }
 
-hm_tiss_color_pal <- colorRamp2(c(0, 3, 4), c("#000000", "#17ffc6", "#baffee"))
+hm_tiss_color_pal <- colorRamp2(c(0, 1, 4), c("#baffee", "#17ffc6", "#000000"))
 
 hm_cell_number_width_mm <- 8
 hm_cell_width_mm <- 5
