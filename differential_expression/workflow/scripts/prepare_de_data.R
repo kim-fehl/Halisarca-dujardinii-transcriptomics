@@ -34,38 +34,26 @@ for (path in c(opt$output_rds, opt$output_metadata)) {
 }
 
 read_metadata_table <- function(path) {
-  attempts <- list(
-    function() read_tsv(path, locale = locale(encoding = "UTF-16"), progress = FALSE, show_col_types = FALSE),
-    function() read_tsv(path, progress = FALSE, show_col_types = FALSE)
+  result <- tryCatch(
+    read_tsv(path, progress = FALSE, show_col_types = FALSE),
+    error = function(e) e
   )
 
-  errors <- character()
-  for (reader in attempts) {
-    result <- tryCatch(reader(), error = function(e) e)
-    if (!inherits(result, "error")) {
-      return(result)
-    }
-    errors <- c(errors, conditionMessage(result))
+  if (inherits(result, "error")) {
+    stop(
+      sprintf("Unable to read metadata table as UTF-8/ASCII: %s\n%s", path, conditionMessage(result)),
+      call. = FALSE
+    )
   }
 
-  stop(
-    paste(c(
-      sprintf("Unable to read metadata table: %s", path),
-      errors
-    ), collapse = "\n"),
-    call. = FALSE
-  )
+  result
 }
 
 metadata_raw <- read_metadata_table(opt$metadata)
 
 sample_id_candidates <- c(
   "sample_name",
-  "sample_id",
-  "Sk_sample_id",
-  "IDB_sample_id",
-  "library_name",
-  "run_accession"
+  "sample_id"
 )
 sample_id_col <- sample_id_candidates[sample_id_candidates %in% names(metadata_raw)]
 if (length(sample_id_col) == 0) {
