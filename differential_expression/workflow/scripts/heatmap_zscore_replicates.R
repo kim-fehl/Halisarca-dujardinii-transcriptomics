@@ -101,7 +101,11 @@ if (!length(baseline_samples)) {
 median_baseline <- apply(cpm_mat[go_ids, baseline_samples, drop = FALSE], 1, median, na.rm = TRUE)
 names(median_baseline) <- ann$name
 
-condition_levels <- unique(metadata$condition)
+all_condition_levels <- unique(metadata$condition)
+condition_levels <- c(
+  opt$baseline_level,
+  setdiff(all_condition_levels, opt$baseline_level)
+)
 stratum_levels <- unique(metadata$stratum)
 
 metadata <- metadata %>%
