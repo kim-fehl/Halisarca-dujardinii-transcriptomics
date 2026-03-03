@@ -24,11 +24,17 @@ if BATCH_CORR_ENABLED:
     PRE_DE_TARGETS.append(rules.pca_batch_correction.output.pdf)
 
 FOUR_SEASONS_DE_TARGETS = [
-    rules.edgeR_results.output.tsv,
-    rules.volcano_plot.output.png,
-    rules.volcano_stats.output.tsv,
-    rules.heatmap_data.output.cpm_lfc,
-    rules.heatmap_data.output.sample_stats,
+    rules.edgeR_results_four_seasons.output.tsv,
+    rules.volcano_plot_four_seasons.output.png,
+    rules.volcano_stats_four_seasons.output.tsv,
+    rules.heatmap_data_four_seasons.output.cpm_lfc,
+    rules.heatmap_data_four_seasons.output.sample_stats,
     *HEATMAP_PDF_TARGETS,
     *HEATMAP_XLSX_TARGETS,
+]
+
+GENERAL_DE_TARGETS = [
+    rules.edgeR_results_general.output.tsv,
+    rules.volcano_plot_general.output.png,
+    rules.volcano_stats_general.output.tsv,
 ]

@@ -12,6 +12,7 @@ include: "rules/align.smk"
 include: "rules/quantify.smk"
 include: "rules/batch_corr.smk"
 include: "rules/de_four_seasons.smk"
+include: "rules/de_general.smk"
 include: "rules/targets.smk"
 
 
@@ -23,6 +24,11 @@ rule pre_de:
 rule de_four_seasons:
     input:
         *FOUR_SEASONS_DE_TARGETS
+
+
+rule de_general:
+    input:
+        *GENERAL_DE_TARGETS
 
 
 rule all:

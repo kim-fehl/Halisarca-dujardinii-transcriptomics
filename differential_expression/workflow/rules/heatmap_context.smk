@@ -11,7 +11,12 @@ def _slugify(value):
 
 
 def _expand_path(path):
-    return os.path.expanduser(path) if isinstance(path, str) else path
+    if not isinstance(path, str):
+        return path
+    p = Path(os.path.expanduser(path))
+    if not p.is_absolute():
+        p = Path(workflow.basedir).resolve().parent / p
+    return str(p)
 
 
 HEATMAP_GENOME_NAME = config.get("genome").get("name")
@@ -32,8 +37,8 @@ for entry in _raw_genesets:
     HEATMAP_GENESETS.append({
         "name": slug,
         "path": path,
-        "pdf": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}.pdf",
-        "xlsx": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}.xlsx",
+        "pdf": f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.pdf",
+        "xlsx": f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{slug}_four_seasons.xlsx",
     })
 
 _names = [g["name"] for g in HEATMAP_GENESETS]

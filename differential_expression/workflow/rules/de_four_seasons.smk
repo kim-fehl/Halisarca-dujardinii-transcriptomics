@@ -11,8 +11,8 @@ else:
     ]
 
 HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "24h_Autumn12")
-HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj.rds"
-HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR.tsv"
+HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj_four_seasons.rds"
+HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR_four_seasons.tsv"
 
 
 rule validate_de_four_seasons_config:
@@ -31,12 +31,12 @@ rule validate_de_four_seasons_config:
             )
 
 
-rule edgeR_results:
+rule edgeR_results_four_seasons:
     input:
         rds=rules.prepare_de_data.output.rds,
         cfg=rules.validate_de_four_seasons_config.output
     output:
-        tsv="results/de/edgeR/results_long.tsv.gz"
+        tsv="results/de/edgeR/results_long_four_seasons.tsv.gz"
     params:
         baseline_level=lambda wildcards: DE_BASELINE_LEVEL,
         compare_levels=lambda wildcards: ",".join(DE_COMPARE_LEVELS) if DE_COMPARE_LEVELS else ""
@@ -52,11 +52,11 @@ rule edgeR_results:
         """
 
 
-rule volcano_plot:
+rule volcano_plot_four_seasons:
     input:
-        results=rules.edgeR_results.output.tsv
+        results=rules.edgeR_results_four_seasons.output.tsv
     output:
-        png="results/de/plots/volcano_plot.png"
+        png="results/de/plots/volcano_plot_four_seasons.png"
     params:
         lfc_fold=lambda wildcards: float(config["processing"].get("volcano_fold_threshold", 1.5)),
         fdr=lambda wildcards: float(config["processing"].get("volcano_fdr_threshold", 0.01))
@@ -73,11 +73,11 @@ rule volcano_plot:
         """
 
 
-rule volcano_stats:
+rule volcano_stats_four_seasons:
     input:
-        results=rules.edgeR_results.output.tsv
+        results=rules.edgeR_results_four_seasons.output.tsv
     output:
-        tsv="results/de/stats/volcano_counts.tsv"
+        tsv="results/de/stats/volcano_counts_four_seasons.tsv"
     params:
         lfc_fold=lambda wildcards: float(config["processing"].get("volcano_fold_threshold", 1.5)),
         fdr=lambda wildcards: float(config["processing"].get("volcano_fdr_threshold", 0.01))
@@ -94,10 +94,10 @@ rule volcano_stats:
         """
 
 
-rule heatmap_data:
+rule heatmap_data_four_seasons:
     input:
         rds=rules.prepare_de_data.output.rds,
-        results=rules.edgeR_results.output.tsv
+        results=rules.edgeR_results_four_seasons.output.tsv
     output:
         cpm_lfc=HEATMAP_DATA_RDS,
         sample_stats=HEATMAP_SAMPLE_STATS
@@ -116,14 +116,14 @@ rule heatmap_data:
         """
 
 
-rule heatmap_plot:
+rule heatmap_plot_four_seasons:
     input:
         cpm=HEATMAP_DATA_RDS,
         sample_stats=HEATMAP_SAMPLE_STATS,
         geneset=lambda wildcards: HEATMAP_GENESET_MAP[wildcards.geneset]["path"]
     output:
-        pdf=f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}.pdf",
-        xlsx=f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}.xlsx"
+        pdf=f"results/de/plots/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}_four_seasons.pdf",
+        xlsx=f"results/de/edgeR/heatmap_{HEATMAP_GENOME_NAME}_{{geneset}}_four_seasons.xlsx"
     params:
         set_name=HEATMAP_SET_NAME,
         genome=HEATMAP_GENOME_NAME

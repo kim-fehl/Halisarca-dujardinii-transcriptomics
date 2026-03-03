@@ -48,14 +48,20 @@ The dataset (NCBI BioProject PRJNA594150) contains _H. dujardinii_ bulk RNA-seq 
    snakemake --cores "$(nproc)" --use-conda de_four_seasons
    ```
 
+4. Build generalized DE outputs (contrasts from each `de.compare_levels` to `de.baseline_level` within each stratum):
+
+   ```bash
+   snakemake --cores "$(nproc)" --use-conda de_general
+   ```
+
 > **Important:** Always run the pipeline with `--use-conda` so rule-specific environments (especially the R dependencies for DE and heatmaps) are resolved automatically.
 
-Use `snakemake --cores "$(nproc)" --use-conda all` to materialize everything in one run. Re-run any target whenever inputs or configuration change; Snakemake rebuilds only stale products.
+Use `snakemake --cores "$(nproc)" --use-conda all` to materialize `pre_de + de_four_seasons` in one run. Re-run any target whenever inputs or configuration change; Snakemake rebuilds only stale products.
 
-To regenerate heatmaps for all configured gene sets only:
+To regenerate 4-season heatmaps for all configured gene sets only:
 
 ```bash
-snakemake --cores 8 --use-conda heatmap_plot
+snakemake --cores 8 --use-conda heatmap_plot_four_seasons
 ```
 
 ## Input preparation
@@ -120,7 +126,8 @@ The metadata reader accepts UTF-16 (legacy table) and UTF-8 TSV.
 ## Targets
 
 - `pre_de`: FASTQ staging, trimming, mapping, counts, QC reports, and PCA batch-correction plot (no edgeR/volcano/heatmaps)
-- `de_four_seasons`: current season-specific DE outputs, volcano plot/stat summary, and heatmaps
+- `de_four_seasons`: current season-specific DE outputs (`*_four_seasons`), volcano plot/stat summary, and heatmaps
+- `de_general`: generalized DE outputs (`*_general`) where contrasts are `compare_levels` vs `baseline_level` within each stratum
 - `all`: `pre_de` + `de_four_seasons`
 
 Notes:
@@ -134,5 +141,6 @@ Notes:
 | Counts & metadata | `results/counts/counts_exons.tsv.gz`, `results/de/data/de_data.rds` |
 | QC | `results/qc/multiqc_fastp/*.html`, `results/qc/rseqc/featurecounts_strand.txt` |
 | Batch assessment (when batch correction enabled) | `results/de/plots/pca_batch_correction.pdf` |
-| Volcano plots | `results/de/plots/volcano_plot.png`, `results/de/stats/volcano_counts.tsv` |
-| Heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>.xlsx` |
+| General DE | `results/de/edgeR/results_long_general.tsv.gz`, `results/de/plots/volcano_plot_general.png`, `results/de/stats/volcano_counts_general.tsv` |
+| 4-season DE | `results/de/edgeR/results_long_four_seasons.tsv.gz`, `results/de/plots/volcano_plot_four_seasons.png`, `results/de/stats/volcano_counts_four_seasons.tsv` |
+| 4-season heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_four_seasons.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_four_seasons.xlsx` |
