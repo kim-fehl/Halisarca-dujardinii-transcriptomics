@@ -33,6 +33,7 @@ The dataset (NCBI BioProject PRJNA594150) contains _H. dujardinii_ bulk RNA-seq 
    - `project.fastq_path` (base directory for relative FASTQ paths in the samplesheet)
    - `genome.fasta` and `genome.annotation`
    - `de.stratum_column`, `de.condition_column`, `de.baseline_level` (defaults match the current 4-season dataset)
+   - `de.save_all_genes_cpm_table` (`true` to also write `results/de/data/cpm_all_genes.tsv.gz` during `prepare_de_data`)
    - `batch_correction.enabled` (`auto`/`true`/`false`; `auto` runs ComBat/PCA only when the stratum has >1 level)
    - `heatmap.set_name` (current 4-season heatmap subset label; used in intermediate filenames)
    - Each entry under `genesets` with the desired `name` (used in output filenames) and Excel `path`
@@ -131,7 +132,6 @@ The metadata reader expects standard UTF-8/ASCII TSV.
 
 ## Targets
 
-- `pre_de`: FASTQ staging, trimming, mapping, counts, QC reports, and PCA batch-correction plot (no edgeR/volcano/heatmaps)
 - `pca_general`: PCA summary plot at `results/de/plots/pca_general.pdf` (raw PCA for one batch; batch-corrected panel when batch correction is enabled)
 - `pre_de`: FASTQ staging, trimming, mapping, counts, QC reports, and `pca_general` (no edgeR/volcano/heatmaps)
 - `de_four_seasons`: current season-specific DE outputs (`*_four_seasons`), volcano plot/stat summary, and heatmaps
@@ -146,7 +146,7 @@ Notes:
 
 | Stage | Outputs |
 | --- | --- |
-| Counts & metadata | `results/counts/counts_exons.tsv.gz`, `results/de/data/de_data.rds` |
+| Counts & metadata | `results/counts/counts_exons.tsv.gz`, `results/de/data/de_data.rds` (plus optional `results/de/data/cpm_all_genes.tsv.gz` when `de.save_all_genes_cpm_table: true`) |
 | QC | `results/qc/multiqc_fastp/*.html`, `results/qc/rseqc/featurecounts_strand.txt` |
 | PCA summary | `results/de/plots/pca_general.pdf` (raw PCA for one batch; batch-corrected panel for multi-batch) |
 | General DE | `results/de/edgeR/results_long_general.tsv.gz`, `results/de/plots/volcano_plot_general.png`, `results/de/stats/volcano_counts_general.tsv` |

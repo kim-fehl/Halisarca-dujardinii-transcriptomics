@@ -25,6 +25,7 @@ de:
   condition_column: BiologicalState
   baseline_level: intact_body
   compare_levels: [larvae_fromtissue, aggr24h_freeswim]
+  save_all_genes_cpm_table: false  # if true, write results/de/data/cpm_all_genes.tsv.gz in prepare_de_data
 
 batch_correction:
   enabled: false  # single stratum dataset; no ComBat/PCA batch correction

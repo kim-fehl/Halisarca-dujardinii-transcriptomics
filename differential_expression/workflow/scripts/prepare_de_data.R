@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({
   library(optparse)
+  library(edgeR)
   library(readr)
   library(dplyr)
   library(stringr)
@@ -9,7 +10,7 @@ suppressPackageStartupMessages({
 
 option_list <- list(
   make_option("--counts", type = "character", dest = "counts", help = "featureCounts TSV (gzipped)"),
-  make_option("--metadata", type = "character", dest = "metadata", help = "Sample metadata TSV (UTF-16 or UTF-8)"),
+  make_option("--metadata", type = "character", dest = "metadata", help = "Sample metadata TSV (UTF-8/ASCII)"),
   make_option("--stratum-column", type = "character", dest = "stratum_column", default = "season",
               help = "Metadata column used as stratum/batch (normalized to 'season') [default %default]"),
   make_option("--condition-column", type = "character", dest = "condition_column", default = "aggregation_stage",
@@ -17,7 +18,9 @@ option_list <- list(
   make_option("--batch-column", type = "character", dest = "batch_column", default = NULL,
               help = "Metadata batch column (normalized to 'batch'); defaults to stratum-column"),
   make_option("--output-rds", type = "character", dest = "output_rds", help = "Output RDS with counts and metadata"),
-  make_option("--output-metadata", type = "character", dest = "output_metadata", help = "Output TSV with filtered metadata")
+  make_option("--output-metadata", type = "character", dest = "output_metadata", help = "Output TSV with filtered metadata"),
+  make_option("--output-cpm-all", type = "character", dest = "output_cpm_all", default = "",
+              help = "Optional output TSV.gz with normalized CPM for all retained genes/samples")
 )
 
 parser <- OptionParser(option_list = option_list)
@@ -31,6 +34,9 @@ if (is.null(opt$counts) || is.null(opt$metadata) ||
 
 for (path in c(opt$output_rds, opt$output_metadata)) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+}
+if (!is.null(opt$output_cpm_all) && nzchar(trimws(opt$output_cpm_all))) {
+  dir.create(dirname(opt$output_cpm_all), recursive = TRUE, showWarnings = FALSE)
 }
 
 read_metadata_table <- function(path) {
@@ -169,6 +175,14 @@ colnames(counts_mat) <- metadata$sample_id
 if (any(duplicated(metadata$sample_id))) {
   dupes <- metadata$sample_id[duplicated(metadata$sample_id)]
   stop(sprintf("Duplicate sample_ids found: %s", paste(unique(dupes), collapse = ", ")))
+}
+
+if (!is.null(opt$output_cpm_all) && nzchar(trimws(opt$output_cpm_all))) {
+  dgl <- DGEList(counts = counts_mat)
+  dgl <- calcNormFactors(dgl)
+  cpm_all <- as.data.frame(edgeR::cpm(dgl)) %>%
+    rownames_to_column("gene_id")
+  write_tsv(cpm_all, opt$output_cpm_all)
 }
 
 saveRDS(list(counts = counts_mat, metadata = metadata), file = opt$output_rds)

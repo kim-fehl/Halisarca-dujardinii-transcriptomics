@@ -26,6 +26,7 @@ de:
   condition_column: aggregation_stage
   baseline_level: Body
   compare_levels: [Cells, Aggregates]
+  save_all_genes_cpm_table: false  # if true, write results/de/data/cpm_all_genes.tsv.gz in prepare_de_data
 
 batch_correction:
   enabled: auto  # auto|true|false; auto runs only if de.stratum_column has >1 level in metadata

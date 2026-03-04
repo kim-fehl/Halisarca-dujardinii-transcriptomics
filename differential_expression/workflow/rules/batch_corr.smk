@@ -4,6 +4,11 @@ from pathlib import Path
 DE_CFG = config.get("de", {}) or {}
 DE_STRATUM_COLUMN = DE_CFG.get("stratum_column", "season")
 DE_CONDITION_COLUMN = DE_CFG.get("condition_column", "aggregation_stage")
+_raw_save_all_genes_cpm = DE_CFG.get("save_all_genes_cpm_table", False)
+if isinstance(_raw_save_all_genes_cpm, str):
+    DE_SAVE_ALL_GENES_CPM_TABLE = _raw_save_all_genes_cpm.strip().lower() in {"1", "true", "yes", "y", "on"}
+else:
+    DE_SAVE_ALL_GENES_CPM_TABLE = bool(_raw_save_all_genes_cpm)
 
 BATCH_CFG = config.get("batch_correction", {}) or {}
 BATCH_CORR_MODE = str(BATCH_CFG.get("enabled", "auto")).strip().lower()
@@ -34,30 +39,58 @@ else:
     BATCH_CORR_ENABLED = len(_batch_levels) > 1
 
 
-rule prepare_de_data:
-    input:
-        counts="results/counts/counts_exons.tsv.gz",
-        metadata=lambda wildcards: str(Path(config["project"]["metadata"]).expanduser())
-    output:
-        rds="results/de/data/de_data.rds",
-        metadata="results/de/data/sample_metadata.tsv"
-    params:
-        stratum_column=lambda wildcards: DE_STRATUM_COLUMN,
-        condition_column=lambda wildcards: DE_CONDITION_COLUMN,
-        batch_column=lambda wildcards: BATCH_CORR_BATCH_COLUMN
-    conda:
-        "../envs/r_de.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/prepare_de_data.R \
-            --counts {input.counts} \
-            --metadata {input.metadata} \
-            --stratum-column '{params.stratum_column}' \
-            --condition-column '{params.condition_column}' \
-            --batch-column '{params.batch_column}' \
-            --output-rds {output.rds} \
-            --output-metadata {output.metadata}
-        """
+if DE_SAVE_ALL_GENES_CPM_TABLE:
+    rule prepare_de_data:
+        input:
+            counts="results/counts/counts_exons.tsv.gz",
+            metadata=lambda wildcards: str(Path(config["project"]["metadata"]).expanduser())
+        output:
+            rds="results/de/data/de_data.rds",
+            metadata="results/de/data/sample_metadata.tsv",
+            cpm_all="results/de/data/cpm_all_genes.tsv.gz"
+        params:
+            stratum_column=lambda wildcards: DE_STRATUM_COLUMN,
+            condition_column=lambda wildcards: DE_CONDITION_COLUMN,
+            batch_column=lambda wildcards: BATCH_CORR_BATCH_COLUMN
+        conda:
+            "../envs/r_de.yaml"
+        shell:
+            """
+            Rscript workflow/scripts/prepare_de_data.R \
+                --counts {input.counts} \
+                --metadata {input.metadata} \
+                --stratum-column '{params.stratum_column}' \
+                --condition-column '{params.condition_column}' \
+                --batch-column '{params.batch_column}' \
+                --output-rds {output.rds} \
+                --output-metadata {output.metadata} \
+                --output-cpm-all {output.cpm_all}
+            """
+else:
+    rule prepare_de_data:
+        input:
+            counts="results/counts/counts_exons.tsv.gz",
+            metadata=lambda wildcards: str(Path(config["project"]["metadata"]).expanduser())
+        output:
+            rds="results/de/data/de_data.rds",
+            metadata="results/de/data/sample_metadata.tsv"
+        params:
+            stratum_column=lambda wildcards: DE_STRATUM_COLUMN,
+            condition_column=lambda wildcards: DE_CONDITION_COLUMN,
+            batch_column=lambda wildcards: BATCH_CORR_BATCH_COLUMN
+        conda:
+            "../envs/r_de.yaml"
+        shell:
+            """
+            Rscript workflow/scripts/prepare_de_data.R \
+                --counts {input.counts} \
+                --metadata {input.metadata} \
+                --stratum-column '{params.stratum_column}' \
+                --condition-column '{params.condition_column}' \
+                --batch-column '{params.batch_column}' \
+                --output-rds {output.rds} \
+                --output-metadata {output.metadata}
+            """
 
 
 if BATCH_CORR_ENABLED:
