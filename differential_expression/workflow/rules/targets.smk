@@ -31,6 +31,8 @@ FOUR_SEASONS_DE_TARGETS = [
     *HEATMAP_XLSX_FOUR_SEASONS_TARGETS,
     *HEATMAP_ZSCORE_PDF_FOUR_SEASONS_TARGETS,
 ]
+if DE_SAVE_ALL_GENES_CPM_TABLE:
+    FOUR_SEASONS_DE_TARGETS.append(rules.all_genes_cpm_with_de_four_seasons.output.tsv)
 
 GENERAL_DE_TARGETS = [
     rules.edgeR_results_general.output.tsv,
@@ -42,3 +44,5 @@ GENERAL_DE_TARGETS = [
     *HEATMAP_XLSX_GENERAL_TARGETS,
     *HEATMAP_ZSCORE_PDF_GENERAL_TARGETS,
 ]
+if DE_SAVE_ALL_GENES_CPM_TABLE:
+    GENERAL_DE_TARGETS.append(rules.all_genes_cpm_with_de_general.output.tsv)

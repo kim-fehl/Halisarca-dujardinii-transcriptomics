@@ -33,7 +33,7 @@ The dataset (NCBI BioProject PRJNA594150) contains _H. dujardinii_ bulk RNA-seq 
    - `project.fastq_path` (base directory for relative FASTQ paths in the samplesheet)
    - `genome.fasta` and `genome.annotation`
    - `de.stratum_column`, `de.condition_column`, `de.baseline_level` (defaults match the current 4-season dataset)
-   - `de.save_all_genes_cpm_table` (`true` to also write `results/de/data/cpm_all_genes.tsv.gz` during `prepare_de_data`)
+   - `de.save_all_genes_cpm_table` (`true` to also write `results/de/data/cpm_all_genes.tsv.gz` during `prepare_de_data`, plus merged all-genes CPM+DE tables in DE targets)
    - `batch_correction.enabled` (`auto`/`true`/`false`; `auto` runs ComBat/PCA only when the stratum has >1 level)
    - `heatmap.set_name` (current 4-season heatmap subset label; used in intermediate filenames)
    - Each entry under `genesets` with the desired `name` (used in output filenames) and Excel `path`
@@ -149,7 +149,7 @@ Notes:
 | Counts & metadata | `results/counts/counts_exons.tsv.gz`, `results/de/data/de_data.rds` (plus optional `results/de/data/cpm_all_genes.tsv.gz` when `de.save_all_genes_cpm_table: true`) |
 | QC | `results/qc/multiqc_fastp/*.html`, `results/qc/rseqc/featurecounts_strand.txt` |
 | PCA summary | `results/de/plots/pca_general.pdf` (raw PCA for one batch; batch-corrected panel for multi-batch) |
-| General DE | `results/de/edgeR/results_long_general.tsv.gz`, `results/de/plots/volcano_plot_general.png`, `results/de/stats/volcano_counts_general.tsv` |
+| General DE | `results/de/edgeR/results_long_general.tsv.gz`, `results/de/plots/volcano_plot_general.png`, `results/de/stats/volcano_counts_general.tsv` (plus optional `results/de/data/cpm_all_genes_with_de_general.tsv.gz` when `de.save_all_genes_cpm_table: true`) |
 | General heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_general.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_general.xlsx`, `results/de/plots/heatmap_zscore_<genome>_<geneset>_general.pdf` |
-| 4-season DE | `results/de/edgeR/results_long_four_seasons.tsv.gz`, `results/de/plots/volcano_plot_four_seasons.png`, `results/de/stats/volcano_counts_four_seasons.tsv` |
+| 4-season DE | `results/de/edgeR/results_long_four_seasons.tsv.gz`, `results/de/plots/volcano_plot_four_seasons.png`, `results/de/stats/volcano_counts_four_seasons.tsv` (plus optional `results/de/data/cpm_all_genes_with_de_four_seasons.tsv.gz` when `de.save_all_genes_cpm_table: true`) |
 | 4-season heatmaps & gene-set tables | `results/de/plots/heatmap_<genome>_<geneset>_four_seasons.pdf`, `results/de/edgeR/heatmap_<genome>_<geneset>_four_seasons.xlsx`, `results/de/plots/heatmap_zscore_<genome>_<geneset>_four_seasons.pdf` |

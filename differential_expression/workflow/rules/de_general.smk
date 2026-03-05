@@ -13,6 +13,7 @@ else:
 GENERAL_HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "general")
 GENERAL_HEATMAP_DATA_RDS = f"results/de/data/{GENERAL_HEATMAP_SET_NAME}_cpm_lfc_padj_general.rds"
 GENERAL_HEATMAP_SAMPLE_STATS = f"results/de/data/{GENERAL_HEATMAP_SET_NAME}_samples_stats_general.tsv"
+GENERAL_ALL_GENES_CPM_DE = "results/de/data/cpm_all_genes_with_de_general.tsv.gz"
 
 
 rule edgeR_results_general:
@@ -33,6 +34,24 @@ rule edgeR_results_general:
             --baseline-level '{params.baseline_level}' \
             --compare-levels '{params.compare_levels}'
         """
+
+
+if DE_SAVE_ALL_GENES_CPM_TABLE:
+    rule all_genes_cpm_with_de_general:
+        input:
+            cpm=rules.prepare_de_data.output.cpm_all,
+            results=rules.edgeR_results_general.output.tsv
+        output:
+            tsv=GENERAL_ALL_GENES_CPM_DE
+        conda:
+            "../envs/r_de.yaml"
+        shell:
+            """
+            Rscript workflow/scripts/merge_cpm_de_tables.R \
+                --cpm-tsv '{input.cpm}' \
+                --edgeR-tsv '{input.results}' \
+                --output-tsv '{output.tsv}'
+            """
 
 
 rule volcano_plot_general:

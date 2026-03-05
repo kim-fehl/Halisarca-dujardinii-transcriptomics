@@ -13,6 +13,7 @@ else:
 HEATMAP_SET_NAME = (config.get("heatmap", {}) or {}).get("set_name", "24h_Autumn12")
 HEATMAP_DATA_RDS = f"results/de/data/{HEATMAP_SET_NAME}_cpm_lfc_padj_four_seasons.rds"
 HEATMAP_SAMPLE_STATS = f"results/de/data/{HEATMAP_SET_NAME}_samples_stats.edgeR_four_seasons.tsv"
+FOUR_SEASONS_ALL_GENES_CPM_DE = "results/de/data/cpm_all_genes_with_de_four_seasons.tsv.gz"
 
 
 rule validate_de_four_seasons_config:
@@ -50,6 +51,24 @@ rule edgeR_results_four_seasons:
             --baseline-level '{params.baseline_level}' \
             --compare-levels '{params.compare_levels}'
         """
+
+
+if DE_SAVE_ALL_GENES_CPM_TABLE:
+    rule all_genes_cpm_with_de_four_seasons:
+        input:
+            cpm=rules.prepare_de_data.output.cpm_all,
+            results=rules.edgeR_results_four_seasons.output.tsv
+        output:
+            tsv=FOUR_SEASONS_ALL_GENES_CPM_DE
+        conda:
+            "../envs/r_de.yaml"
+        shell:
+            """
+            Rscript workflow/scripts/merge_cpm_de_tables.R \
+                --cpm-tsv '{input.cpm}' \
+                --edgeR-tsv '{input.results}' \
+                --output-tsv '{output.tsv}'
+            """
 
 
 rule volcano_plot_four_seasons:
